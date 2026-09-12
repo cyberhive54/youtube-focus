@@ -16,7 +16,13 @@ $Host.UI.RawUI.WindowTitle = "YouTube Focus - Brave Uninstall Protection Tool"
 $extId = "lbolmjfaffmiakolleghaplidjlnlphe"
 $updateUrl = "https://raw.githubusercontent.com/cyberhive54/youtube-focus/main/update.xml"
 $policyValue = "$extId;$updateUrl"
-$policyRegKey = "HKLM:\SOFTWARE\Policies\BraveSoftware\Brave-Browser\ExtensionInstallForcelist"
+
+$policyRegKeys = @(
+    "HKLM:\SOFTWARE\Policies\BraveSoftware\Brave\ExtensionInstallForcelist",
+    "HKLM:\SOFTWARE\Policies\BraveSoftware\Brave-Browser\ExtensionInstallForcelist",
+    "HKCU:\SOFTWARE\Policies\BraveSoftware\Brave\ExtensionInstallForcelist",
+    "HKCU:\SOFTWARE\Policies\BraveSoftware\Brave-Browser\ExtensionInstallForcelist"
+)
 
 function Show-Header {
     Clear-Host
@@ -33,37 +39,37 @@ function Enable-Protection {
     Write-Host "Applying Brave Enterprise Policy..." -ForegroundColor Yellow
 
     try {
-        if (-not (Test-Path $policyRegKey)) {
-            New-Item -Path $policyRegKey -Force | Out-Null
-        }
-        
-        # Check existing values to not overwrite other extensions
-        $props = Get-ItemProperty -Path $policyRegKey -ErrorAction SilentlyContinue
-        $found = $false
-        $nextSlot = 1
+        foreach ($key in $policyRegKeys) {
+            if (-not (Test-Path $key)) {
+                New-Item -Path $key -Force -ErrorAction SilentlyContinue | Out-Null
+            }
+            
+            $props = Get-ItemProperty -Path $key -ErrorAction SilentlyContinue
+            $found = $false
+            $nextSlot = 1
 
-        if ($props) {
-            foreach ($p in $props.PSObject.Properties) {
-                if ($p.Name -match "^\d+$") {
-                    $slotNum = [int]$p.Name
-                    if ($slotNum -ge $nextSlot) { $nextSlot = $slotNum + 1 }
-                    if ($p.Value -like "*$extId*") {
-                        Set-ItemProperty -Path $policyRegKey -Name $p.Name -Value $policyValue -Force
-                        $found = $true
-                        Write-Host "  [OK] Updated slot $($p.Name) with current update URL." -ForegroundColor Green
-                        break
+            if ($props) {
+                foreach ($p in $props.PSObject.Properties) {
+                    if ($p.Name -match "^\d+$") {
+                        $slotNum = [int]$p.Name
+                        if ($slotNum -ge $nextSlot) { $nextSlot = $slotNum + 1 }
+                        if ($p.Value -like "*$extId*") {
+                            Set-ItemProperty -Path $key -Name $p.Name -Value $policyValue -Force
+                            $found = $true
+                            break
+                        }
                     }
                 }
             }
-        }
 
-        if (-not $found) {
-            Set-ItemProperty -Path $policyRegKey -Name "$nextSlot" -Value $policyValue -Force
-            Write-Host "  [OK] Registered policy at slot $nextSlot." -ForegroundColor Green
+            if (-not $found) {
+                Set-ItemProperty -Path $key -Name "$nextSlot" -Value $policyValue -Force
+            }
+            Write-Host "  [OK] Policy registered in: $key" -ForegroundColor Green
         }
 
         Write-Host ""
-        Write-Host "SUCCESS: Policy applied to Brave!" -ForegroundColor Green
+        Write-Host "SUCCESS: Policy applied to all Brave policy paths!" -ForegroundColor Green
         Write-Host ""
         
         $running = Get-Process brave -ErrorAction SilentlyContinue
@@ -90,56 +96,57 @@ function Disable-Protection {
     Show-Header
     Write-Host "Removing Brave Enterprise Policy..." -ForegroundColor Yellow
 
-    if (Test-Path $policyRegKey) {
-        $props = Get-ItemProperty -Path $policyRegKey -ErrorAction SilentlyContinue
-        $removed = $false
-        if ($props) {
-            foreach ($p in $props.PSObject.Properties) {
-                if ($p.Value -like "*$extId*") {
-                    Remove-ItemProperty -Path $policyRegKey -Name $p.Name -Force -ErrorAction SilentlyContinue
-                    Write-Host "  [OK] Removed YouTube Focus policy from slot $($p.Name)." -ForegroundColor Green
-                    $removed = $true
+    foreach ($key in $policyRegKeys) {
+        if (Test-Path $key) {
+            $props = Get-ItemProperty -Path $key -ErrorAction SilentlyContinue
+            $removed = $false
+            if ($props) {
+                foreach ($p in $props.PSObject.Properties) {
+                    if ($p.Value -like "*$extId*") {
+                        Remove-ItemProperty -Path $key -Name $p.Name -Force -ErrorAction SilentlyContinue
+                        Write-Host "  [OK] Removed from $key (slot $($p.Name))" -ForegroundColor Green
+                        $removed = $true
+                    }
                 }
             }
+            if (-not $removed) {
+                Write-Host "  [--] Not present in $key" -ForegroundColor Gray
+            }
         }
-        if (-not $removed) {
-            Write-Host "  [--] YouTube Focus policy was not present." -ForegroundColor Gray
-        }
-    } else {
-        Write-Host "  [--] Policy key does not exist." -ForegroundColor Gray
     }
 
     Write-Host ""
-    Write-Host "SUCCESS: Policy removed." -ForegroundColor Green
+    Write-Host "SUCCESS: Policy removed from all paths." -ForegroundColor Green
     Write-Host ""
     Read-Host "Press Enter to continue"
 }
 
 function View-Status {
     Show-Header
-    Write-Host "Current Brave Policy Status:" -ForegroundColor Yellow
+    Write-Host "Current Brave Policy Status across registry keys:" -ForegroundColor Yellow
     Write-Host ""
 
-    if (Test-Path $policyRegKey) {
-        $props = Get-ItemProperty -Path $policyRegKey -ErrorAction SilentlyContinue
-        $found = $false
-        if ($props) {
-            foreach ($p in $props.PSObject.Properties) {
-                if ($p.Name -match "^\d+$") {
-                    Write-Host "  Slot $($p.Name) : $($p.Value)" -ForegroundColor Cyan
-                    if ($p.Value -like "*$extId*") { $found = $true }
+    $anyFound = $false
+    foreach ($key in $policyRegKeys) {
+        if (Test-Path $key) {
+            $props = Get-ItemProperty -Path $key -ErrorAction SilentlyContinue
+            if ($props) {
+                foreach ($p in $props.PSObject.Properties) {
+                    if ($p.Name -match "^\d+$") {
+                        Write-Host "  [$key]" -ForegroundColor Gray
+                        Write-Host "    Slot $($p.Name) : $($p.Value)" -ForegroundColor Cyan
+                        if ($p.Value -like "*$extId*") { $anyFound = $true }
+                    }
                 }
             }
         }
-        if ($found) {
-            Write-Host ""
-            Write-Host "STATUS: YouTube Focus is [PROTECTED / FORCE-INSTALLED]" -ForegroundColor Green
-        } else {
-            Write-Host ""
-            Write-Host "STATUS: YouTube Focus is [NOT CONFIGURED IN POLICY]" -ForegroundColor Gray
-        }
+    }
+
+    Write-Host ""
+    if ($anyFound) {
+        Write-Host "STATUS: YouTube Focus is [PROTECTED / FORCE-INSTALLED]" -ForegroundColor Green
     } else {
-        Write-Host "STATUS: No Brave extension policies configured." -ForegroundColor Gray
+        Write-Host "STATUS: YouTube Focus is [NOT CONFIGURED IN POLICY]" -ForegroundColor Gray
     }
 
     Write-Host ""
