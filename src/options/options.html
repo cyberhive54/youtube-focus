@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube Focus — Settings</title>
+<link rel="stylesheet" href="../shared/apple.css">
+<link rel="stylesheet" href="options.css">
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to settings</a>
+<main class="page" id="main-content" tabindex="-1">
+  <header class="hero">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg></div>
+    <div>
+      <h1 class="ytf-title">YouTube Focus</h1>
+      <p class="ytf-body muted">Less distraction on YouTube, more control over how you spend your time.</p>
+    </div>
+    <button class="help-btn" id="helpBtn" type="button">How it works</button>
+    <span class="badge" id="modeBadge">normal</span>
+  </header>
+
+  <section class="ytf-card block intro">
+    <h2 class="ytf-headline">Start here</h2>
+    <p class="ytf-body">Choose a simple starting plan below. You can customize the optional controls later.</p>
+    <div class="start-plans" role="group" aria-label="Choose a starting plan">
+      <button class="ytf-btn ytf-btn-primary" type="button" data-start-plan="focus">Use a daily limit</button>
+      <button class="ytf-btn ytf-btn-secondary" type="button" data-start-plan="study">Set up Study Mode</button>
+      <button class="ytf-btn ytf-btn-secondary" type="button" data-start-plan="full">Block YouTube</button>
+    </div>
+    <p class="ytf-caption">Daily limit keeps YouTube useful; Study Mode needs one allowed channel or video first; Full Block keeps only Watch Later and Studio available.</p>
+  </section>
+
+  <section class="ytf-card block">
+    <h2 class="ytf-headline">Focus</h2>
+    <div class="ytf-row" style="padding-left:0;padding-right:0">
+      <div><strong>Blocking</strong><div class="ytf-caption" id="masterSub">The master switch. When off, YouTube is normal unless an automatic schedule is active. While a schedule runs, blocking is locked on.</div></div>
+      <label class="ytf-switch"><input type="checkbox" id="sMaster"><span class="track"></span><span class="thumb"></span></label>
+    </div>
+    <div id="unblockStatusBox" class="cooldown-box" style="display:none">
+      <span>⏳ Unblocking YouTube in <strong id="unblockTimer">05:00</strong></span>
+      <button type="button" class="ytf-btn ytf-btn-secondary cooldown-cancel" id="btnCancelUnblock">Cancel</button>
+    </div>
+    <div class="ytf-divider"></div>
+    <div class="ytf-row" style="padding-left:0;padding-right:0">
+      <div>
+        <strong>Daily YouTube limit (minutes)</strong>
+        <div class="ytf-caption">How much active YouTube time per day. Watching, searching and browsing all count; background tabs and idle time don't.</div>
+        <div id="quotaError" class="ytf-caption" style="display:none;color:#d70015;margin-top:4px;font-weight:500" role="alert">Must be a number between 1 and 1440 minutes.</div>
+      </div>
+      <input id="lQuotaMin" type="number" min="1" max="1440" style="width:90px">
+    </div>
+    <div class="ytf-divider"></div>
+    <div class="ytf-caption label" style="padding:12px 0 8px">Mode — applies when Blocking is on</div>
+    <div class="ytf-pill-group" id="modeGroup">
+      <button class="ytf-pill" data-mode="normal">Normal</button>
+      <button class="ytf-pill" data-mode="restricted">Restricted</button>
+      <button class="ytf-pill" data-mode="study">Study</button>
+      <button class="ytf-pill" data-mode="full">Full Block</button>
+    </div>
+    <p class="ytf-caption" id="modeHint"></p>
+    <ul class="mode-explainer" role="list">
+      <li><strong>Normal:</strong> your daily limit plus the distraction controls you choose.</li>
+      <li><strong>Restricted:</strong> Search and Subscriptions work; videos must open from same-tab YouTube Search.</li>
+      <li><strong>Study:</strong> approved channels and videos only. Add one first.</li>
+      <li><strong>Full Block:</strong> only Watch Later and YouTube Studio remain available.</li>
+    </ul>
+    <div class="ytf-body" id="focusStatus" style="margin-top:10px">–</div>
+  </section>
+
+  <section class="ytf-card block">
+    <h2 class="ytf-headline">Schedule</h2>
+    <p class="ytf-caption">Turn modes on automatically. Local time. While a schedule runs, blocking turns on automatically and cannot be switched off. Overlapping schedules are rejected.</p>
+    <ul class="list" id="schList"></ul>
+    <div class="addrow wrap">
+      <select id="schMode"><option value="normal">Normal</option><option value="restricted">Restricted</option><option value="study" selected>Study</option><option value="full">Full Block</option></select>
+      <input id="schFrom" type="time" value="09:00">
+      <input id="schTo" type="time" value="17:00">
+      <button class="ytf-btn ytf-btn-secondary" id="schAdd">Add schedule</button>
+    </div>
+    <div class="ytf-pill-group" id="schDayGroup" style="padding:8px 0 0">
+      <button class="ytf-pill active" data-schday="1">Mon</button>
+      <button class="ytf-pill active" data-schday="2">Tue</button>
+      <button class="ytf-pill active" data-schday="3">Wed</button>
+      <button class="ytf-pill active" data-schday="4">Thu</button>
+      <button class="ytf-pill active" data-schday="5">Fri</button>
+      <button class="ytf-pill" data-schday="6">Sat</button>
+      <button class="ytf-pill" data-schday="0">Sun</button>
+    </div>
+    <div id="schError" class="ytf-caption" style="display:none;color:#d70015;margin-top:8px;font-weight:500" role="alert"></div>
+  </section>
+
+  <section class="ytf-card block">
+    <h2 class="ytf-headline">Sessions</h2>
+    <p class="ytf-caption">When you open YouTube, pick how long this visit may last — as a share of your daily limit. A session is a ceiling, not a reservation: it never grants more than your remaining time, and ending early spends only what you used.</p>
+    <div><strong>Session choices (% of daily limit, max 4)</strong><div class="ytf-caption">Tap to toggle (choose up to 4). Removing applies now; adding applies tomorrow.</div></div>
+    <div class="ytf-pill-group" id="sessOptGroup" style="padding:8px 0 0">
+      <button class="ytf-pill" data-sessopt="2">2%</button>
+      <button class="ytf-pill" data-sessopt="5">5%</button>
+      <button class="ytf-pill" data-sessopt="10">10%</button>
+      <button class="ytf-pill" data-sessopt="15">15%</button>
+      <button class="ytf-pill" data-sessopt="20">20%</button>
+      <button class="ytf-pill" data-sessopt="25">25%</button>
+      <button class="ytf-pill" data-sessopt="30">30%</button>
+      <button class="ytf-pill" data-sessopt="50">50%</button>
+    </div>
+    <div class="ytf-caption" id="sessPendingLine" style="margin-top:8px"></div>
+  </section>
+
+  <section class="ytf-card block">
+    <h2 class="ytf-headline">Reminders</h2>
+    <p class="ytf-caption">Short non-blocking notes as your daily usage crosses a share of your limit. Each fires once per day and never pauses anything.</p>
+    <div><strong>Remind me at</strong></div>
+    <div class="ytf-pill-group" id="remGroup" style="padding:8px 0 0">
+      <button class="ytf-pill" data-rem="10">10%</button>
+      <button class="ytf-pill" data-rem="25">25%</button>
+      <button class="ytf-pill" data-rem="50">50%</button>
+      <button class="ytf-pill" data-rem="75">75%</button>
+      <button class="ytf-pill" data-rem="90">90%</button>
+    </div>
+  </section>
+
+  <section class="ytf-card block" id="sec-content">
+    <h2 class="ytf-headline">Content controls</h2>
+    <p class="ytf-caption">Change what YouTube shows. These never touch your time budget — that lives under Focus above. In stricter modes the mode itself decides, and managed settings step aside below.</p>
+    <details class="disclosure" id="grp-shorts">
+      <summary>Shorts <span class="ytf-caption" id="sum-shorts" style="font-weight:400"></span></summary>
+    <div class="ytf-caption govsum" id="govsum-shorts" style="display:none"></div>
+    <div class="ytf-row"><div><strong>Block Shorts</strong><div class="ytf-caption">Stops Shorts from playing — even when Blocking is off. Shelves and the Shorts tab live under Feeds &amp; discovery below.</div></div><label class="ytf-switch"><input type="checkbox" id="sShorts"><span class="track"></span><span class="thumb"></span></label></div>
+    <div id="rowFirstShort">
+      <div class="ytf-divider"></div>
+      <div class="ytf-row"><div><strong>Allow the first Short</strong><div class="ytf-caption">Lets you watch the Short you opened. Moving to another Short will still be blocked.</div></div><label class="ytf-switch"><input type="checkbox" id="sFirst"><span class="track"></span><span class="thumb"></span></label></div>
+    </div>
+    <details class="disclosure">
+      <summary>Customize Shorts</summary>
+      <div class="ytf-row" style="align-items:flex-start">
+        <div><strong>Daily Shorts limit</strong><div class="ytf-caption">Choose how Shorts are limited each day. Study-allowlisted channels and videos always bypass this limit.</div></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+          <select id="selShortsLimit">
+            <option value="no-cap">No cap (Unlimited)</option>
+            <option value="block-all">Block all Shorts</option>
+            <option value="set-number">Set daily limit</option>
+          </select>
+          <div id="boxShortsSlider" style="display:none;align-items:center;gap:8px">
+            <input type="range" id="rngShorts" min="1" max="500" value="20" style="width:120px">
+            <span class="badge" id="badgeShortsVal" style="min-width:32px;text-align:center">20</span>
+          </div>
+        </div>
+      </div>
+      <input id="lShorts" type="hidden">
+    </details>
+    </details>
+    <details class="disclosure" id="grp-search">
+      <summary>Search <span class="ytf-caption" id="sum-search" style="font-weight:400"></span></summary>
+    <p class="ytf-caption">Search stays useful while removing clutter. Pick how strict it should be.</p>
+    <div class="ytf-pill-group" id="searchGroup">
+      <button class="ytf-pill" data-sp="allow">Allow</button>
+      <button class="ytf-pill" data-sp="allow-clean">Hide distractions</button>
+      <button class="ytf-pill" data-sp="block">Block search</button>
+      <button class="ytf-pill" data-sp="strict-allowlist">Study: allowed only</button>
+    </div>
+    </details>
+    <details class="disclosure" id="grp-feeds">
+      <summary>Feeds &amp; discovery <span class="ytf-caption" id="sum-feeds" style="font-weight:400"></span></summary>
+    <div class="ytf-caption govsum" id="govsum-feeds" style="display:none"></div>
+    <p class="ytf-caption">Remove the parts of YouTube that pull you in. These apply in Normal mode; stricter modes manage them automatically.</p>
+    <div class="ytf-row"><div><strong>Hide Home feed</strong><div class="ytf-caption">Hides the Home recommendation feed.</div></div><label class="ytf-switch"><input type="checkbox" id="sHome"><span class="track"></span><span class="thumb"></span></label></div>
+    <div class="ytf-divider"></div>
+    <div class="ytf-row"><div><strong>Hide Up Next</strong><div class="ytf-caption">Stops YouTube from filling the next video with another recommendation.</div></div><label class="ytf-switch"><input type="checkbox" id="sUpNext"><span class="track"></span><span class="thumb"></span></label></div>
+    <div class="ytf-caption govsum" id="govsum-recs" style="display:none"></div>
+    <details class="disclosure">
+      <summary>Customize recommendations</summary>
+      <div class="ytf-row"><div><strong>Hide Explore / Trending</strong><div class="ytf-caption">Removes the Explore and Trending discovery pages.</div></div><label class="ytf-switch"><input type="checkbox" id="sExplore"><span class="track"></span><span class="thumb"></span></label></div>
+      <div class="ytf-divider"></div>
+      <div class="ytf-row"><div><strong>Hide related videos</strong><div class="ytf-caption">Removes suggestion lists that can pull you into another video.</div></div><label class="ytf-switch"><input type="checkbox" id="sRelated"><span class="track"></span><span class="thumb"></span></label></div>
+      <div class="ytf-divider"></div>
+      <div class="ytf-row"><div><strong>Hide end-screen cards</strong><div class="ytf-caption">Removes the clickable suggestions that appear when a video ends.</div></div><label class="ytf-switch"><input type="checkbox" id="sEnd"><span class="track"></span><span class="thumb"></span></label></div>
+      <div class="ytf-divider"></div>
+      <div class="ytf-row"><div><strong>Hide Shorts shelves</strong><div class="ytf-caption">Removes rows of Shorts mixed into feeds and search results.</div></div><label class="ytf-switch"><input type="checkbox" id="sShelves"><span class="track"></span><span class="thumb"></span></label></div>
+      <div class="ytf-divider"></div>
+      <div class="ytf-row"><div><strong>Hide Shorts tab</strong><div class="ytf-caption">Removes the Shorts entry from the sidebar and navigation.</div></div><label class="ytf-switch"><input type="checkbox" id="sTab"><span class="track"></span><span class="thumb"></span></label></div>
+      <div class="ytf-divider"></div>
+      <div class="ytf-row"><div><strong>Turn off autoplay</strong><div class="ytf-caption">Stops YouTube from starting the next video on its own.</div></div><label class="ytf-switch"><input type="checkbox" id="sAutoplay"><span class="track"></span><span class="thumb"></span></label></div>
+    </details>
+    </details>
+  </section>
+
+  <section class="ytf-card block">
+    <h2 class="ytf-headline">Study Mode</h2>
+    <p class="ytf-body">Only the channels and videos you choose are available. Everything else stays out of the way.</p>
+    <p class="ytf-caption">Match priority: channel ID → channel link → handle. Paste a channel URL or handle.</p>
+    <p class="setup-note" id="studySetupNote" role="status" hidden></p>
+    <div class="addrow">
+      <input id="chInput" placeholder="https://www.youtube.com/@MITOCW  or  @handle  or  UCxxxx">
+      <button class="ytf-btn ytf-btn-primary" id="chAdd">Add channel</button>
+    </div>
+    <ul class="list" id="chList"></ul>
+    <div class="addrow" style="margin-top:12px">
+      <input id="vidInput" placeholder="Allowed video URL (youtube.com/watch?v=…)">
+      <button class="ytf-btn ytf-btn-secondary" id="vidAdd">Allow video</button>
+    </div>
+    <ul class="list" id="vidList"></ul>
+    <div class="ytf-caption" style="margin-top:12px"><strong>First setup works now.</strong> Your first allowed channel or video can start Study Mode today. Later additions and removals activate at 00:00, so a block can't be bypassed by changing the list.</div>
+    <ul class="list" id="pendList"></ul>
+    <div class="ytf-row" style="padding-left:0;padding-right:0">
+      <div><strong>Study timer</strong><div class="ytf-caption">Start a timed Study session right now (same as the popup).</div></div>
+    </div>
+    <div class="ytf-pill-group" id="stTimerGroup" style="padding:0 0 8px">
+      <button class="ytf-pill" data-sttimer="25">25 min</button>
+      <button class="ytf-pill" data-sttimer="50">50 min</button>
+      <button class="ytf-pill" data-sttimer="90">90 min</button>
+      <button class="ytf-pill" data-sttimer="0">End session</button>
+    </div>
+    <div class="ytf-caption" id="stTimerLine" style="margin-top:4px"></div>
+    <p class="ytf-caption">Tip: start a timed study session from the extension popup, or set automatic hours below in Schedule.</p>
+  </section>
+
+  <section class="ytf-card block">
+    <h2 class="ytf-headline">Video &amp; watch limits</h2>
+    <p class="ytf-caption">Separate from your daily YouTube budget above — these cap actual video playback only.</p>
+    <div class="ytf-row" style="align-items:flex-start;padding-left:0;padding-right:0">
+      <div>
+        <strong>Videos per day</strong>
+        <div class="ytf-caption">Limit how many videos can be played per day. Study-allowlisted channels and videos bypass this limit.</div>
+        <div id="warnBlockAllVideos" class="ytf-caption" style="display:none;color:#d70015;margin-top:4px;font-weight:500">Blocking all videos stops regular video playback completely. Only allowlisted Study channels/videos can play.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+        <select id="selVideosLimit">
+          <option value="no-limit">No limit (Unlimited)</option>
+          <option value="block-all">Block all videos</option>
+          <option value="set-limit">Set daily limit</option>
+        </select>
+        <div id="boxVideosSlider" style="display:none;align-items:center;gap:8px">
+          <input type="range" id="rngVideos" min="1" max="100" value="10" style="width:120px">
+          <span class="badge" id="badgeVideosVal" style="min-width:32px;text-align:center">10</span>
+        </div>
+      </div>
+    </div>
+    <input type="hidden" id="lVideos">
+    <div class="ytf-divider" style="margin:0"></div>
+    <div class="ytf-row" style="align-items:flex-start;padding-left:0;padding-right:0">
+      <div>
+        <strong>Daily watch limit (minutes)</strong>
+        <div class="ytf-caption">Limit total video playback time per day. Browsing and searching count toward your daily quota instead.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+        <select id="selMinsLimit">
+          <option value="no-limit">No limit (Unlimited)</option>
+          <option value="set-limit">Set daily limit</option>
+        </select>
+        <div id="boxMinsSlider" style="display:none;align-items:center;gap:8px">
+          <input type="range" id="rngMins" min="5" max="600" step="5" value="60" style="width:120px">
+          <span class="badge" id="badgeMinsVal" style="min-width:40px;text-align:center">60m</span>
+        </div>
+      </div>
+    </div>
+    <input type="hidden" id="lMins">
+    <p class="ytf-caption" style="margin-top:10px">After you reach a limit, video playback pauses until tomorrow. Browsing and searching count toward the daily YouTube limit instead. Study-allowlisted channels and videos are always immune to these limits.</p>
+  </section>
+
+  <section class="ytf-card block">
+    <h2 class="ytf-headline">Extra time after daily limit</h2>
+    <p class="ytf-caption">Choose whether extra time can be unlocked once your daily YouTube limit is reached. When disabled, YouTube blocks completely for the rest of the day.</p>
+    <div class="ytf-row" style="padding-left:0;padding-right:0">
+      <div><strong>Allow extra time after daily limit</strong><div class="ytf-caption">When off, YouTube blocks immediately once daily limit runs out. When on, extra time comes from a separate pool with a limit on starts.</div></div>
+      <label class="ytf-switch"><input type="checkbox" id="sEmOn"><span class="track"></span><span class="thumb"></span></label>
+    </div>
+    <div class="ytf-divider"></div>
+    <div class="ytf-row" style="padding-left:0;padding-right:0">
+      <div><strong>Extra-time pool (% of daily limit)</strong><div class="ytf-caption" id="emLeftLine">50% pool, resets at midnight</div></div>
+      <input id="lEmTotal" type="number" min="0" max="400" style="width:90px">
+    </div>
+    <div class="ytf-divider"></div>
+    <div class="ytf-row" style="padding-left:0;padding-right:0">
+      <div><strong>Max extra-time starts per day</strong><div class="ytf-caption">0 = unlimited. Every started session spends one, even a 30-second peek.</div></div>
+      <input id="lEmUses" type="number" min="0" max="50" style="width:90px">
+    </div>
+    <div class="ytf-divider"></div>
+    <div><strong>Extra-time choices (max 4)</strong><div class="ytf-caption">Percentages of the daily limit. Removing applies now; adding applies tomorrow. Up to 4 active choices.</div></div>
+    <div class="ytf-pill-group" id="emOptGroup" style="padding:8px 0 0">
+      <button class="ytf-pill" data-emopt="1">1%</button>
+      <button class="ytf-pill" data-emopt="2">2%</button>
+      <button class="ytf-pill" data-emopt="3">3%</button>
+      <button class="ytf-pill" data-emopt="5">5%</button>
+      <button class="ytf-pill" data-emopt="10">10%</button>
+      <button class="ytf-pill" data-emopt="15">15%</button>
+      <button class="ytf-pill" data-emopt="20">20%</button>
+      <button class="ytf-pill" data-emopt="25">25%</button>
+      <button class="ytf-pill" data-emopt="50">50%</button>
+      <button class="ytf-pill" data-emopt="100">100%</button>
+    </div>
+    <div class="ytf-caption" id="emPendingLine" style="margin-top:8px"></div>
+    <p class="ytf-caption">Loosening the limit (bigger pool, more starts, new lengths, or removing the cap) takes effect <strong>tomorrow</strong> — so it can't rescue today's session. Tightening applies instantly.</p>
+  </section>
+
+  <section class="ytf-card block strict-card">
+    <h2 class="ytf-headline">Strict Mode</h2>
+    <p class="ytf-body">Locks your Focus settings while you are in a focused session. This prevents changing the rules just because you feel tempted to.</p>
+    <div class="ytf-row" style="padding-left:0;padding-right:0">
+      <div><strong>Strict Mode (hard lock)</strong><div class="ytf-caption">Locks mode, settings, schedules, allowed channels, limits, and pausing.</div></div>
+      <label class="ytf-switch"><input type="checkbox" id="sStrict"><span class="track"></span><span class="thumb"></span></label>
+    </div>
+    <div id="strictStatusBox" class="cooldown-box" style="display:none">
+      <span>⏳ Strict Mode unlocking in <strong id="strictTimer">30:00</strong></span>
+      <button type="button" class="ytf-btn ytf-btn-secondary cooldown-cancel" id="btnCancelStrict">Cancel</button>
+    </div>
+    <p class="ytf-caption">Honest note: Strict Mode stops changes inside the extension. You can still disable or remove the extension from your browser's extension settings — no extension can prevent that.</p>
+  </section>
+
+  <section class="ytf-card block">
+    <h2 class="ytf-headline">Analytics</h2>
+    <div id="anEmptyBox" class="empty-state" style="display:none;padding:20px;text-align:center;color:var(--ytf-text-2);background:var(--ytf-fill-2);border-radius:12px;margin:8px 0;font-size:13px">No YouTube activity recorded yet today. Use YouTube with Focus active to track your time.</div>
+    <div id="anContentBox">
+      <div class="ytf-body" id="anToday">–</div>
+      <div class="ytf-caption" style="margin-top:12px"><strong>Focus streaks</strong></div>
+      <div class="ytf-body" id="anStreaks">–</div>
+      <div class="ytf-caption" style="margin-top:12px"><strong>Blocked today</strong></div>
+      <div class="ytf-body" id="statsBox">–</div>
+      <div class="ytf-caption" style="margin-top:12px" id="anChartCap"><strong>Usage vs quota — last 14 days</strong></div>
+      <div class="ytf-caption" id="anChartEmpty" style="display:none">Usage history — no previous-day data yet.</div>
+      <canvas id="anChart" width="640" height="180" style="width:100%;height:auto"></canvas>
+      <div class="ytf-caption" style="margin-top:12px"><strong>History</strong></div>
+      <ul class="list" id="anHistory"></ul>
+    </div>
+  </section>
+
+  <section class="ytf-card block">
+    <details class="disclosure">
+      <summary>Advanced</summary>
+      <p class="ytf-caption">Rarely needed. Everything here is also safe to leave alone.</p>
+      <button class="ytf-btn ytf-btn-danger" id="resetBtn" type="button">Reset all settings</button>
+      <p class="ytf-caption">If YouTube changes its layout and something stops hiding, reload the extension on the extensions page, then refresh the YouTube tab.</p>
+    </details>
+  </section>
+  <div class="saved-pill" id="savedPill">✓ Saved — applied instantly</div>
+  <dialog class="ytf-dialog" id="welcomeDialog" aria-labelledby="welcomeTitle">
+    <form method="dialog" class="dialog-close"><button type="submit" aria-label="Close welcome setup">×</button></form>
+    <h2 id="welcomeTitle" class="ytf-title">Set up YouTube Focus</h2>
+    <p class="ytf-body">Start with one plan. You can change every setting later.</p>
+    <div class="dialog-plans" id="welcomePlans">
+      <button class="ytf-btn ytf-btn-primary" type="button" data-welcome-plan="focus">Use a daily limit</button>
+      <button class="ytf-btn ytf-btn-secondary" type="button" data-welcome-plan="study">Study only</button>
+      <button class="ytf-btn ytf-btn-secondary" type="button" data-welcome-plan="full">Block YouTube</button>
+    </div>
+    <ul class="mode-explainer" role="list">
+      <li><strong>Daily limit:</strong> Normal mode with a 60-minute daily budget.</li>
+      <li><strong>Study only:</strong> add a channel, then allow only approved content.</li>
+      <li><strong>Block YouTube:</strong> keep only Watch Later and Studio.</li>
+    </ul>
+    <div id="welcomeStudy" hidden>
+      <label for="welcomeChannel">Add one study channel to begin now</label>
+      <p class="ytf-caption">Paste a YouTube channel URL, @handle, or channel ID. You can add more tomorrow.</p>
+      <input id="welcomeChannel" type="text" placeholder="https://youtube.com/@MITOCW or @handle" autocomplete="off">
+      <p class="setup-note" id="welcomeStudyError" role="status" hidden></p>
+      <div class="dialog-actions">
+        <button class="ytf-btn ytf-btn-primary" id="welcomeStudyStart" type="button">Start Study Mode</button>
+        <button class="ytf-btn ytf-btn-secondary" id="welcomeStudyBack" type="button">Back</button>
+      </div>
+    </div>
+    <p class="ytf-caption">Blocking starts only after you choose a plan.</p>
+  </dialog>
+  <dialog class="ytf-dialog" id="helpDialog" aria-labelledby="helpTitle">
+    <form method="dialog" class="dialog-close"><button type="submit" aria-label="Close help">×</button></form>
+    <h2 id="helpTitle" class="ytf-title">How YouTube Focus works</h2>
+    <ol class="help-list" role="list">
+      <li><strong>Turn on Blocking.</strong> It activates the plan you choose.</li>
+      <li><strong>Normal</strong> keeps YouTube useful and removes distractions; <strong>Restricted</strong> allows videos opened from same-tab YouTube Search only.</li>
+      <li><strong>Study Mode</strong> allows only your approved channels and videos. Add one before turning it on.</li>
+      <li><strong>Daily limit</strong> counts active use. When it ends, the extra-time limit decides whether more time is available.</li>
+    </ol>
+    <p class="ytf-caption">Tip: the popup shows your current mode, time remaining, and the next action.</p>
+    <form method="dialog"><button class="ytf-btn ytf-btn-primary" type="submit">Got it</button></form>
+  </dialog>
+  <dialog class="ytf-dialog" id="resetDialog" aria-labelledby="resetTitle">
+    <form method="dialog" class="dialog-close"><button type="submit" aria-label="Cancel reset">×</button></form>
+    <!-- Layer 1: Warning -->
+    <div id="resetLayer1">
+      <h2 id="resetTitle" class="ytf-title" style="color:var(--ytf-danger)">Reset all settings?</h2>
+      <p class="ytf-body">This will permanently delete all your Focus settings, schedules, Study Mode channels, usage history, and streaks.</p>
+      <p class="ytf-caption">This action cannot be undone. Your extension will return to brand-new default state.</p>
+      <div class="dialog-actions" style="margin-top:16px">
+        <button class="ytf-btn ytf-btn-danger" id="resetBtnNext1" type="button">I understand, continue</button>
+        <button class="ytf-btn ytf-btn-secondary" id="resetBtnCancel1" type="button">Cancel</button>
+      </div>
+    </div>
+    <!-- Layer 2 & 3: Type confirmation and final action -->
+    <div id="resetLayer2" hidden>
+      <h2 class="ytf-title" style="color:var(--ytf-danger)">Confirm Reset</h2>
+      <p class="ytf-body">Type <strong style="letter-spacing:1px">RESET</strong> below to confirm permanent deletion.</p>
+      <input id="resetConfirmInput" type="text" placeholder="Type RESET" autocomplete="off" style="text-transform:uppercase;margin:12px 0">
+      <div class="dialog-actions">
+        <button class="ytf-btn ytf-btn-danger" id="resetBtnFinal" type="button" disabled style="background:#d70015;color:#fff">Permanently erase all data</button>
+        <button class="ytf-btn ytf-btn-secondary" id="resetBtnCancel2" type="button">Cancel</button>
+      </div>
+    </div>
+  </dialog>
+</main>
+<script src="../shared/constants.js"></script>
+<script src="../shared/storage.js"></script>
+<script src="../content/youtube-detector.js"></script>
+<script src="../content/policy-engine.js"></script>
+<script src="options.js"></script>
+</body>
+</html>

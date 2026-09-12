@@ -1,0 +1,55 @@
+body { width: 360px; }
+.wrap { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.head { display: flex; align-items: center; gap: 10px; padding: 2px 2px 0; }
+.logo {
+  width: 38px; height: 38px; border-radius: 12px; flex: none;
+  background: linear-gradient(145deg, #0a84ff, #0068d1);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 113, 227, 0.35);
+}
+.logo svg { width: 20px; height: 20px; }
+.badge {
+  margin-left: auto; font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+  background: var(--ytf-fill-2); border: 1px solid var(--ytf-separator);
+  padding: 4px 10px; border-radius: 980px; text-transform: uppercase;
+}
+.section { padding: 12px 4px; }
+.section .label { padding: 0 16px 8px; letter-spacing: 0.08em; font-weight: 700; }
+.section .ytf-pill-group { padding: 0 12px 8px; }
+.quota { padding: 4px 16px 0; font-size: 20px; line-height: 26px; font-weight: 700; letter-spacing: -0.02em; }
+.foot { padding-bottom: 4px; }
+#grantGroup { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+#grantGroup .ytf-choice { position: relative; min-height: 44px; overflow: hidden; }
+#grantGroup .ytf-choice > span { position: relative; z-index: 1; }
+#grantGroup .ytf-choice.ytf-cooling { opacity: 1; }
+#grantGroup .ytf-choice.ytf-cooling::after { content: ""; position: absolute; inset: 0; z-index: 0; background: rgba(29,29,31,.48); transform-origin: right center; animation: ytf-popup-cooldown var(--ytf-cooldown-ms) linear forwards; }
+@keyframes ytf-popup-cooldown { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { #grantGroup .ytf-choice.ytf-cooling::after { animation: none; opacity: .35; } }
+@media (max-width: 340px) {
+  body { width: 320px; }
+}
+
+/* Cooldown boxes */
+.cooldown-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--ytf-fill-2);
+  border: 1px solid rgba(255, 149, 0, 0.3);
+  border-radius: 12px;
+  padding: 6px 12px;
+  margin: 8px 12px 0;
+  font-size: 12px;
+  color: var(--ytf-text);
+}
+.cooldown-box strong {
+  font-family: monospace, var(--ytf-font);
+  font-size: 13px;
+  color: #e06c00;
+  margin-left: 4px;
+}
+.cooldown-cancel {
+  min-height: 26px !important;
+  padding: 0 10px !important;
+  font-size: 11px !important;
+}

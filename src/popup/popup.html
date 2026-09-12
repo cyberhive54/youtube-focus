@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube Focus</title>
+<link rel="stylesheet" href="../shared/apple.css">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="head">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+    </div>
+    <div>
+      <div class="ytf-headline">YouTube Focus</div>
+      <div class="ytf-caption" id="statusLine">Loading…</div>
+    </div>
+    <span class="badge" id="modeBadge">–</span>
+  </header>
+
+  <section class="ytf-card section">
+    <div class="quota" id="quotaLine">–</div>
+    <div class="ytf-caption" id="quotaSubLine"></div>
+  </section>
+
+  <section class="ytf-card section">
+    <div class="ytf-row">
+      <div><div class="ytf-headline">Blocking</div><div class="ytf-caption" id="masterSub">Off — YouTube is normal</div></div>
+      <label class="ytf-switch"><input type="checkbox" id="tMaster"><span class="track"></span><span class="thumb"></span></label>
+    </div>
+    <div id="unblockStatusBox" class="cooldown-box" style="display:none">
+      <span>⏳ Unblocking in <strong id="unblockTimer">05:00</strong></span>
+      <button type="button" class="ytf-btn ytf-btn-secondary cooldown-cancel" id="btnCancelUnblock">Cancel</button>
+    </div>
+    <div id="strictStatusBox" class="cooldown-box" style="display:none">
+      <span>⏳ Strict unlocking in <strong id="strictTimer">30:00</strong></span>
+      <button type="button" class="ytf-btn ytf-btn-secondary cooldown-cancel" id="btnCancelStrict">Cancel</button>
+    </div>
+  </section>
+
+  <section class="ytf-card section">
+    <div class="ytf-caption label">Mode</div>
+    <div class="ytf-pill-group" id="modeGroup">
+      <button class="ytf-pill" data-mode="normal">Normal</button>
+      <button class="ytf-pill" data-mode="restricted">Restricted</button>
+      <button class="ytf-pill" data-mode="study">Study</button>
+      <button class="ytf-pill" data-mode="full">Full Block</button>
+    </div>
+    <div id="studyJumpBox" style="display:none;padding:0 12px 4px">
+      <button class="ytf-btn ytf-btn-primary" id="studyJumpBtn" style="width:100%;min-height:38px;font-size:13px">📚 Switch to Study Mode</button>
+    </div>
+  </section>
+
+  <section class="ytf-card section" id="sessionCard">
+    <div class="ytf-caption label" id="grantTitle">How long do you want to use YouTube?</div>
+    <div class="ytf-pill-group" id="grantGroup"><!-- choices render here --></div>
+    <div class="ytf-caption" id="grantLine" style="margin-top:8px"></div>
+    <button class="ytf-btn ytf-btn-primary" id="resumeBtn" style="width:100%;margin-top:10px;display:none">End session early</button>
+  </section>
+
+  <footer class="foot">
+    <button class="ytf-btn ytf-btn-secondary" id="openOptions" style="width:100%">Settings</button>
+  </footer>
+</div>
+<script src="../shared/constants.js"></script>
+<script src="../shared/storage.js"></script>
+<script src="../content/youtube-detector.js"></script>
+<script src="../content/policy-engine.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

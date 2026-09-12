@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Focus — Shorts & Distraction Blocker",
+  "short_name": "YT Focus",
+  "version": "2.9.0",
+  "description": "Make YouTube useful without making it addictive. Block Shorts, feeds, recommendations. Study Mode with allowlist, schedules, limits.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwpXtqYrEqdeAqQJ5fjtpO+vNtI+ttQMk6hmYEddX4Mvqt3xdIzNbbpVHNljKRD3HQnsoxgb22K+sBnjBOWrpgyHSgvS+1snkjGM5tbBIHrRoI8GXtL9ofcKBza6dbokeHGe/d/pOqYPAe3w384poo8PdgmVHYTZNg4Qa26rb68agQrhfJrDK4bZHEkacpl1tdDP9QhqcLtynVe7GMXV2XBGRSBMSzy6AvoxVdpZ7+smjAm+Cpus/9FxgXkBr4br5lUgDfuTvS+H2Nt1G4aYLFzfqfSlLi1+oc8+SIWCTefNiv7Z/ZSxe7wSN3j3eB1KkI+Rti6luZ+PAujsRpISZHwIDAQAB",
+  "minimum_chrome_version": "109",
+  "permissions": ["storage", "alarms"],
+  "host_permissions": ["*://*.youtube.com/*", "*://*.studio.youtube.com/*"],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": [
+        "src/shared/constants.js",
+        "src/shared/storage.js",
+        "src/content/youtube-detector.js",
+        "src/content/policy-engine.js",
+        "src/content/overlay/shadow-styles.js",
+        "src/content/overlay/blocked-screen.js",
+        "src/content/shorts-blocker.js",
+        "src/content/feed-blocker.js",
+        "src/content/recommendation-blocker.js",
+        "src/content/study-mode.js",
+        "src/content/router.js",
+        "src/content/observer.js",
+        "src/content/index.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_title": "YouTube Focus",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "48": "assets/icons/icon48.png",
+      "128": "assets/icons/icon128.png"
+    }
+  },
+  "options_page": "src/options/options.html",
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/fonts/*"],
+      "matches": ["*://*.youtube.com/*"]
+    }
+  ],
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  }
+}

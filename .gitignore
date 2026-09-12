@@ -1,0 +1,19 @@
+﻿# Local private key
+*.pem
+
+# Scratch & temporary test files
+scratch/
+test_*.js
+test_*.cjs
+test_*.ps1
+check_*.ps1
+update_*.ps1
+find_*.ps1
+list_*.ps1
+print_*.cjs
+capture_*.cjs
+verify_*.ps1
+
+# OS files
+Thumbs.db
+Desktop.ini
