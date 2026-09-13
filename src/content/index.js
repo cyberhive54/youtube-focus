@@ -249,6 +249,7 @@
       overlay.hideBlockedScreen();
       // Unblock = sound back: restore videos WE muted (never the user's own).
       try { window.YTFOCUS.shorts.restoreMutedVideos(); } catch (e) {}
+      try { restoreAllVideos(); } catch (e) {}
       lastBlockKey = null;
       // First-short scroll hook: watching short #1, block when ID changes
       if (ctx.route === 'shorts' && decision.reason === 'first-short') {
@@ -284,6 +285,7 @@
 
     if (decision.action === 'modify') {
       overlay.hideBlockedScreen();
+      try { restoreAllVideos(); } catch (e) {}
       if ((decision.modifications || []).indexOf('filter-search') !== -1 && ctx.route === 'search') {
         window.YTFOCUS.study.filterSearch(settings);
       } else if (ctx.route === 'search') {
@@ -329,14 +331,18 @@
     // A block rendering over an already-fullscreen page must pull it out —
     // native fullscreen would otherwise hide the block itself.
     exitFullscreenIfBlocked();
-    if (screen === 'shorts' || screen === 'study' || screen === 'full' || screen === 'limit') {
-      window.YTFOCUS.shorts.pauseShortsVideo();
+    if (screen === 'shorts' || screen === 'study' || screen === 'full' || screen === 'limit' || screen === 'session') {
+      try { window.YTFOCUS.shorts.pauseShortsVideo(); } catch (e) {}
     }
-    try {
-      document.querySelectorAll('video').forEach(function (v) {
-        try { v.pause(); } catch (e) {}
-      });
-    } catch (e) {}
+    pauseAllVideos();
+    // Catch late-loading and asynchronously buffering YouTube video players
+    [100, 300, 600, 1000, 1500].forEach(function (ms) {
+      setTimeout(function () {
+        if (blockShowing()) {
+          pauseAllVideos();
+        }
+      }, ms);
+    });
     var opts = {
       screen: screen,
       reason: reason,
@@ -454,9 +460,37 @@
 
   function pauseAllVideos() {
     try {
-      document.querySelectorAll('video').forEach(function (v) { v.pause(); });
+      document.querySelectorAll('video, audio').forEach(function (v) {
+        try {
+          v.pause();
+          v.muted = true;
+        } catch (e) {}
+      });
+      var player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+      if (player) {
+        if (typeof player.pauseVideo === 'function') {
+          try { player.pauseVideo(); } catch (e) {}
+        }
+        if (typeof player.mute === 'function') {
+          try { player.mute(); } catch (e) {}
+        }
+      }
     } catch (e) {}
   }
+
+  function restoreAllVideos() {
+    try {
+      document.querySelectorAll('video, audio').forEach(function (v) {
+        try { v.muted = false; } catch (e) {}
+      });
+      var player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+      if (player && typeof player.unMute === 'function') {
+        try { player.unMute(); } catch (e) {}
+      }
+    } catch (e) {}
+  }
+  window.YTFOCUS = window.YTFOCUS || {};
+  window.YTFOCUS.restoreAllVideos = restoreAllVideos;
 
   function exitFullscreenIfBlocked() {
     try {
@@ -468,6 +502,21 @@
   }
 
   function guardShortsKeys() {
+    // Strictly prevent background video from starting playback or audio while blocked
+    ['play', 'playing', 'timeupdate'].forEach(function (evt) {
+      document.addEventListener(evt, function (e) {
+        if (blockShowing()) {
+          try {
+            if (e.target && typeof e.target.pause === 'function') {
+              e.target.pause();
+              e.target.muted = true;
+            }
+          } catch (err) {}
+          pauseAllVideos();
+        }
+      }, true);
+    });
+
     document.addEventListener('keydown', function (e) {
       try {
         // Never break text entry: inputs, search boxes, comments.
@@ -781,6 +830,7 @@
       hadGrant = true;
       try { offerUrl = null; } catch (_oo) {}
       try { window.YTFOCUS.shorts.restoreMutedVideos(); } catch (e2) {}
+      try { restoreAllVideos(); } catch (e3) {}
       window.YTFOCUS.overlay.hideBlockedScreen();
       setTimeout(function () { execute(location.href); }, 300);
     });
