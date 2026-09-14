@@ -109,6 +109,36 @@
     }
   }
 
+  function timeToMin(t) {
+    var p = String(t || '00:00').split(':');
+    return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
+  }
+
+  function scheduleMatches(entry, now) {
+    if (window.YTFOCUS.policy && window.YTFOCUS.policy.scheduleMatches) {
+      return window.YTFOCUS.policy.scheduleMatches(entry, now);
+    }
+    try {
+      var d = new Date(now);
+      var day = d.getDay();
+      var mins = d.getHours() * 60 + d.getMinutes();
+      var from = timeToMin(entry.from);
+      var to = timeToMin(entry.to);
+      if (from <= to) {
+        if (entry.days && entry.days.indexOf(day) === -1) return false;
+        return mins >= from && mins < to;
+      }
+      if (mins >= from) {
+        return !entry.days || entry.days.indexOf(day) !== -1;
+      }
+      if (mins < to) {
+        var prevDay = (day + 6) % 7;
+        return !entry.days || entry.days.indexOf(prevDay) !== -1 || entry.days.indexOf(day) !== -1;
+      }
+      return false;
+    } catch (e) { return false; }
+  }
+
   function render() {
     if (!settings) return;
     updateCooldowns();
@@ -441,51 +471,58 @@
     });
 
     // Schedules
-    var sl = $('schList'); sl.innerHTML = '';
-    if (!(settings.study.schedule || []).length) {
-      sl.innerHTML = '<li class="empty">No automatic schedules — blocking follows your master switch and timers.</li>';
-    }
-    var days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    var modeLabels = (window.YTFOCUS.CONSTANTS || {}).MODE_LABELS || {};
-    (settings.study.schedule || []).forEach(function (e, i) {
-      var li = document.createElement('li');
-      li.innerHTML = '<code></code>';
-      var mText = modeLabels[e.mode] || e.mode;
-      li.querySelector('code').textContent =
-        mText + ' • ' + e.days.map(function (d) { return days[d]; }).join(',') + ' • ' + e.from + '–' + e.to;
-      var isRunning = scheduleMatches(e, now);
-      if (isRunning) {
-        var runBadge = document.createElement('span');
-        runBadge.className = 'sch-badge-running';
-        runBadge.textContent = 'Active now (locked)';
-        li.appendChild(runBadge);
-      } else if (e.pendingRemoval) {
-        var pendBadge = document.createElement('span');
-        pendBadge.className = 'sch-badge-pending';
-        pendBadge.textContent = 'Removal pending (at midnight)';
-        li.appendChild(pendBadge);
-
-        var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = 'Cancel';
-        cancelBtn.style.color = 'var(--ytf-blue)';
-        cancelBtn.addEventListener('click', function () {
-          delete e.pendingRemoval;
-          save({ study: settings.study });
-        });
-        li.appendChild(cancelBtn);
-      } else {
-        var del = document.createElement('button');
-        del.textContent = 'Remove';
-        del.addEventListener('click', function () {
-          e.pendingRemoval = true;
-          var errEl = $('schError');
-          if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
-          save({ study: settings.study });
-        });
-        li.appendChild(del);
+    var sl = $('schList');
+    if (sl) {
+      sl.innerHTML = '';
+      if (!(settings.study.schedule || []).length) {
+        sl.innerHTML = '<li class="empty">No automatic schedules — blocking follows your master switch and timers.</li>';
       }
-      sl.appendChild(li);
-    });
+      var days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      var modeLabels = (window.YTFOCUS.CONSTANTS || {}).MODE_LABELS || {};
+      (settings.study.schedule || []).forEach(function (e, i) {
+        try {
+          var li = document.createElement('li');
+          li.innerHTML = '<code></code>';
+          var mText = modeLabels[e.mode] || e.mode;
+          li.querySelector('code').textContent =
+            mText + ' • ' + (e.days || []).map(function (d) { return days[d]; }).join(',') + ' • ' + e.from + '–' + e.to;
+          var isRunning = scheduleMatches(e, now);
+          if (isRunning) {
+            var runBadge = document.createElement('span');
+            runBadge.className = 'sch-badge-running';
+            runBadge.textContent = 'Active now (locked)';
+            li.appendChild(runBadge);
+          } else if (e.pendingRemoval) {
+            var pendBadge = document.createElement('span');
+            pendBadge.className = 'sch-badge-pending';
+            pendBadge.textContent = 'Removal pending (at midnight)';
+            li.appendChild(pendBadge);
+
+            var cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.style.color = 'var(--ytf-blue)';
+            cancelBtn.addEventListener('click', function () {
+              delete e.pendingRemoval;
+              save({ study: settings.study });
+            });
+            li.appendChild(cancelBtn);
+          } else {
+            var del = document.createElement('button');
+            del.textContent = 'Remove';
+            del.addEventListener('click', function () {
+              e.pendingRemoval = true;
+              var errEl = $('schError');
+              if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+              save({ study: settings.study });
+            });
+            li.appendChild(del);
+          }
+          sl.appendChild(li);
+        } catch (eSchItem) {
+          console.error('[YTFOCUS] Error rendering schedule row:', eSchItem);
+        }
+      });
+    }
 
     // Analytics: today, streaks, 14-day chart, history.
     (function renderAnalytics() {

@@ -23,12 +23,22 @@
     try {
       var d = new Date(now);
       var day = d.getDay();
-      if (entry.days && entry.days.indexOf(day) === -1) return false;
       var mins = d.getHours() * 60 + d.getMinutes();
       var from = timeToMin(entry.from);
       var to = timeToMin(entry.to);
-      if (from <= to) return mins >= from && mins < to;
-      return mins >= from || mins < to; // overnight range
+      if (from <= to) {
+        if (entry.days && entry.days.indexOf(day) === -1) return false;
+        return mins >= from && mins < to;
+      }
+      // Overnight range (e.g. 22:00 to 05:00)
+      if (mins >= from) {
+        return !entry.days || entry.days.indexOf(day) !== -1;
+      }
+      if (mins < to) {
+        var prevDay = (day + 6) % 7;
+        return !entry.days || entry.days.indexOf(prevDay) !== -1 || entry.days.indexOf(day) !== -1;
+      }
+      return false;
     } catch (e) { return false; }
   }
 
@@ -433,6 +443,7 @@
     effectiveMode: effectiveMode,
     scheduledMode: scheduledMode,
     activeSchedule: activeSchedule,
+    scheduleMatches: scheduleMatches,
     isModeTransitionAllowed: isModeTransitionAllowed,
     isStudyActive: isStudyActive,
     isBlockingActive: isBlockingActive,
