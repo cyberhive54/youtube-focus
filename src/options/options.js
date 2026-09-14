@@ -3,8 +3,35 @@
   'use strict';
   var store = window.YTFOCUS.store;
   var settings = null;
+  var expandedSchedules = {};
+  var currentTab = 'focus';
 
   function $(id) { return document.getElementById(id); }
+
+  function setupTabs() {
+    var tabFocus = $('tabFocus');
+    var tabSchedules = $('tabSchedules');
+    var paneFocus = $('paneFocus');
+    var paneSchedules = $('paneSchedules');
+
+    function switchTab(tab) {
+      currentTab = tab;
+      if (tab === 'schedules') {
+        if (tabFocus) { tabFocus.classList.remove('active'); tabFocus.setAttribute('aria-selected', 'false'); }
+        if (tabSchedules) { tabSchedules.classList.add('active'); tabSchedules.setAttribute('aria-selected', 'true'); }
+        if (paneFocus) paneFocus.style.display = 'none';
+        if (paneSchedules) paneSchedules.style.display = 'block';
+      } else {
+        if (tabFocus) { tabFocus.classList.add('active'); tabFocus.setAttribute('aria-selected', 'true'); }
+        if (tabSchedules) { tabSchedules.classList.remove('active'); tabSchedules.setAttribute('aria-selected', 'false'); }
+        if (paneFocus) paneFocus.style.display = 'block';
+        if (paneSchedules) paneSchedules.style.display = 'none';
+      }
+    }
+
+    if (tabFocus) tabFocus.addEventListener('click', function () { switchTab('focus'); });
+    if (tabSchedules) tabSchedules.addEventListener('click', function () { switchTab('schedules'); });
+  }
 
   function locked() {
     return !!(settings && (settings.strictMode || (settings.strictUnlockUntil && settings.strictUnlockUntil > Date.now())));
@@ -14,6 +41,7 @@
     var L = locked();
     document.querySelectorAll('input, button, select').forEach(function (el) {
       if (el.id === 'sStrict' || el.id === 'btnCancelStrict' || el.id === 'btnCancelUnblock' || el.id === 'resetBtn' || el.closest('#resetDialog')) return;
+      if (el.classList.contains('ytf-tab') || el.classList.contains('sch-expand-btn')) return;
       // Strict locks everything except Strict toggle itself (and reset with confirm).
       el.disabled = L;
     });
@@ -596,58 +624,294 @@
     }
 
     // Schedules
-    var sl = $('schList');
-    if (sl) {
+    (function renderScheduleList() {
+      var sl = $('schList');
+      if (!sl) return;
       sl.innerHTML = '';
-      if (!(settings.study.schedule || []).length) {
-        sl.innerHTML = '<li class="empty">No automatic schedules — blocking follows your master switch and timers.</li>';
-      }
-      var days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      var modeLabels = (window.YTFOCUS.CONSTANTS || {}).MODE_LABELS || {};
-      (settings.study.schedule || []).forEach(function (e, i) {
-        try {
-          var li = document.createElement('li');
-          li.innerHTML = '<code></code>';
-          var mText = modeLabels[e.mode] || e.mode;
-          li.querySelector('code').textContent =
-            mText + ' • ' + (e.days || []).map(function (d) { return days[d]; }).join(',') + ' • ' + e.from + '–' + e.to;
-          var isRunning = scheduleMatches(e, now);
-          if (isRunning) {
-            var runBadge = document.createElement('span');
-            runBadge.className = 'sch-badge-running';
-            runBadge.textContent = 'Active now (locked)';
-            li.appendChild(runBadge);
-          } else if (e.pendingRemoval) {
-            var pendBadge = document.createElement('span');
-            pendBadge.className = 'sch-badge-pending';
-            pendBadge.textContent = 'Removal pending (at midnight)';
-            li.appendChild(pendBadge);
+      var list = (settings.study && settings.study.schedule) || [];
+      var countBadge = $('schCountBadge');
+      if (countBadge) countBadge.textContent = list.length;
 
-            var cancelBtn = document.createElement('button');
-            cancelBtn.textContent = 'Cancel';
-            cancelBtn.style.color = 'var(--ytf-blue)';
-            cancelBtn.addEventListener('click', function () {
-              delete e.pendingRemoval;
-              save({ study: settings.study });
-            });
-            li.appendChild(cancelBtn);
-          } else {
-            var del = document.createElement('button');
-            del.textContent = 'Remove';
-            del.addEventListener('click', function () {
-              e.pendingRemoval = true;
-              var errEl = $('schError');
-              if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
-              save({ study: settings.study });
-            });
-            li.appendChild(del);
+      if (!list.length) {
+        sl.innerHTML = '<div class="empty" style="padding:24px;text-align:center;color:var(--ytf-text-2);background:var(--ytf-fill-2);border-radius:14px;font-size:13px">No automatic schedules configured yet. Use the form above to add your first focus schedule.</div>';
+        return;
+      }
+
+      var days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      var modeLabels = (window.YTFOCUS.CONSTANTS || {}).MODE_LABELS || {
+        study: 'Study Mode',
+        restricted: 'Restricted',
+        full: 'Full Block'
+      };
+
+      list.forEach(function (e, i) {
+        try {
+          if (!e.id) e.id = 'sch_' + Date.now() + '_' + i;
+          var sid = e.id;
+          var isRunning = scheduleMatches(e, now);
+          var isStrictLocked = window.YTFOCUS.policy && window.YTFOCUS.policy.isScheduleStrictLocked
+            ? window.YTFOCUS.policy.isScheduleStrictLocked(e, now) : false;
+          var isLocked = isRunning || isStrictLocked || locked();
+          var minsRemaining = (window.YTFOCUS.policy && window.YTFOCUS.policy.scheduleStrictMinutesRemaining)
+            ? window.YTFOCUS.policy.scheduleStrictMinutesRemaining(e, now) : null;
+
+          var card = document.createElement('div');
+          card.className = 'sch-card' +
+            (isRunning ? ' running' : '') +
+            (isStrictLocked ? ' strict-locked' : '') +
+            (e.enabled === false ? ' inactive' : '');
+
+          var isExpanded = !!expandedSchedules[sid];
+          var modeTitle = modeLabels[e.mode] || (e.mode ? (e.mode.charAt(0).toUpperCase() + e.mode.slice(1)) : 'Study');
+          var titleText = e.name ? e.name : (modeTitle + ' Schedule');
+          var daysText = (e.days || []).map(function (d) { return days[d]; }).join(', ');
+          var timeText = e.from + '–' + e.to;
+
+          // Header
+          var header = document.createElement('div');
+          header.className = 'sch-card-header';
+
+          var info = document.createElement('div');
+          info.style.flex = '1';
+          info.style.minWidth = '0';
+
+          var titleEl = document.createElement('div');
+          titleEl.className = 'sch-card-title';
+          titleEl.textContent = titleText;
+          info.appendChild(titleEl);
+
+          var summary = document.createElement('div');
+          summary.className = 'sch-card-summary';
+          summary.innerHTML =
+            '<span class="sch-badge-mode">' + modeTitle + '</span>' +
+            '<span>' + daysText + ' • ' + timeText + '</span>';
+
+          if (isRunning) {
+            summary.innerHTML += '<span class="sch-badge-running">Active now (locked)</span>';
+          } else if (isStrictLocked) {
+            var rText = (minsRemaining !== null && minsRemaining > 0) ? ('starts in ' + minsRemaining + 'm') : 'locked';
+            summary.innerHTML += '<span class="sch-badge-strict">⏳ Strict Locked (' + rText + ')</span>';
+          } else if (e.strict) {
+            summary.innerHTML += '<span class="sch-badge-strict">Strict (' + (e.strictLockMinutes || 60) + 'm)</span>';
           }
-          sl.appendChild(li);
+
+          if (e.notify) {
+            summary.innerHTML += '<span class="sch-badge-notify">🔔 Notify (' + (e.notifyMinutes || 15) + 'm)</span>';
+          }
+
+          if (e.enabled === false) {
+            summary.innerHTML += '<span class="sch-badge-disabled">Inactive</span>';
+          } else {
+            summary.innerHTML += '<span class="sch-badge-enabled">Active</span>';
+          }
+
+          info.appendChild(summary);
+          header.appendChild(info);
+
+          // Actions
+          var actions = document.createElement('div');
+          actions.className = 'sch-actions';
+
+          // Active / Inactive switch
+          var switchLabel = document.createElement('label');
+          switchLabel.className = 'ytf-switch';
+          switchLabel.title = isLocked ? 'Locked while running or strict-locked' : (e.enabled !== false ? 'Active (click to deactivate)' : 'Inactive (click to activate)');
+          var switchInput = document.createElement('input');
+          switchInput.type = 'checkbox';
+          switchInput.checked = e.enabled !== false;
+          switchInput.disabled = isLocked;
+          switchInput.addEventListener('change', function () {
+            if (isLocked) return;
+            e.enabled = switchInput.checked;
+            save({ study: settings.study });
+          });
+          switchLabel.appendChild(switchInput);
+          var trackSpan = document.createElement('span'); trackSpan.className = 'track';
+          var thumbSpan = document.createElement('span'); thumbSpan.className = 'thumb';
+          switchLabel.appendChild(trackSpan);
+          switchLabel.appendChild(thumbSpan);
+          actions.appendChild(switchLabel);
+
+          // Delete button
+          var delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.className = 'sch-delete-btn';
+          delBtn.textContent = 'Delete';
+          delBtn.style.color = 'var(--ytf-danger)';
+          delBtn.style.background = 'none';
+          delBtn.style.border = 'none';
+          delBtn.style.cursor = isLocked ? 'not-allowed' : 'pointer';
+          delBtn.style.fontWeight = '600';
+          delBtn.style.fontSize = '12px';
+          delBtn.style.opacity = isLocked ? '0.4' : '1';
+          delBtn.disabled = isLocked;
+          delBtn.title = isLocked ? 'Cannot delete schedule while running or strict-locked' : 'Delete schedule';
+          delBtn.addEventListener('click', function () {
+            if (isLocked) return;
+            settings.study.schedule.splice(i, 1);
+            save({ study: settings.study });
+          });
+          actions.appendChild(delBtn);
+
+          // Expand / Collapse button
+          var expBtn = document.createElement('button');
+          expBtn.type = 'button';
+          expBtn.className = 'sch-expand-btn' + (isExpanded ? ' open' : '');
+          expBtn.textContent = '▼';
+          expBtn.title = isExpanded ? 'Collapse allowlists' : 'Expand allowlists';
+          expBtn.addEventListener('click', function () {
+            expandedSchedules[sid] = !expandedSchedules[sid];
+            render();
+          });
+          actions.appendChild(expBtn);
+
+          header.appendChild(actions);
+          card.appendChild(header);
+
+          // Body (Allowlists)
+          var body = document.createElement('div');
+          body.className = 'sch-card-body';
+          body.style.display = isExpanded ? 'block' : 'none';
+
+          if (isLocked) {
+            var banner = document.createElement('div');
+            banner.className = 'sch-locked-banner';
+            banner.textContent = '🔒 This schedule is currently actively blocking or strict-locked. Its status, timing, and allowlists cannot be modified until the schedule completes.';
+            body.appendChild(banner);
+          }
+
+          // Allowed Channels
+          var chanSec = document.createElement('div');
+          chanSec.className = 'sch-allowlist-sec';
+          chanSec.innerHTML = '<div class="sch-allowlist-hdr"><span>Allowed channels for this schedule</span></div>';
+
+          var chListUl = document.createElement('ul');
+          chListUl.className = 'list';
+          var chanList = e.allowedChannels || [];
+          if (!chanList.length) {
+            chListUl.innerHTML = '<li class="empty" style="font-size:12px;padding:8px 12px">No schedule-specific channels yet.</li>';
+          } else {
+            chanList.forEach(function (ca, caIdx) {
+              var cli = document.createElement('li');
+              cli.className = 'sch-item';
+              var cLabel = ca.handle || ca.url || ca.id || 'Channel';
+              cli.innerHTML = '<code>' + cLabel + (ca.id && ca.id !== cLabel ? ' (' + ca.id + ')' : '') + '</code>';
+              var cDel = document.createElement('button');
+              cDel.type = 'button';
+              cDel.textContent = 'Remove';
+              cDel.disabled = isLocked;
+              cDel.addEventListener('click', function () {
+                if (isLocked) return;
+                chanList.splice(caIdx, 1);
+                save({ study: settings.study });
+              });
+              cli.appendChild(cDel);
+              chListUl.appendChild(cli);
+            });
+          }
+          chanSec.appendChild(chListUl);
+
+          // Add channel row
+          var chAddRow = document.createElement('div');
+          chAddRow.className = 'addrow';
+          chAddRow.style.marginTop = '6px';
+          var chInput = document.createElement('input');
+          chInput.placeholder = 'Add channel (@handle, URL, or channel ID)';
+          chInput.style.fontSize = '12px';
+          chInput.disabled = isLocked;
+          var chAddBtn = document.createElement('button');
+          chAddBtn.className = 'ytf-btn ytf-btn-secondary';
+          chAddBtn.textContent = 'Add channel';
+          chAddBtn.style.fontSize = '12px';
+          chAddBtn.disabled = isLocked;
+          chAddBtn.addEventListener('click', function () {
+            if (isLocked) return;
+            var parsed = parseChannel(chInput.value);
+            if (!parsed) { chInput.focus(); return; }
+            chInput.value = '';
+            e.allowedChannels = e.allowedChannels || [];
+            e.allowedChannels.push(parsed);
+            save({ study: settings.study });
+          });
+          chAddRow.appendChild(chInput);
+          chAddRow.appendChild(chAddBtn);
+          chanSec.appendChild(chAddRow);
+          body.appendChild(chanSec);
+
+          // Allowed Videos
+          var vidSec = document.createElement('div');
+          vidSec.className = 'sch-allowlist-sec';
+          vidSec.innerHTML = '<div class="sch-allowlist-hdr"><span>Allowed videos for this schedule</span></div>';
+
+          var vidListUl = document.createElement('ul');
+          vidListUl.className = 'list';
+          var vidList = e.allowedVideos || [];
+          if (!vidList.length) {
+            vidListUl.innerHTML = '<li class="empty" style="font-size:12px;padding:8px 12px">No schedule-specific videos yet.</li>';
+          } else {
+            vidList.forEach(function (va, vaIdx) {
+              var vli = document.createElement('li');
+              vli.className = 'sch-item';
+              var vLabel = va.url || va.id || 'Video';
+              vli.innerHTML = '<code>' + vLabel + '</code>';
+              var vDel = document.createElement('button');
+              vDel.type = 'button';
+              vDel.textContent = 'Remove';
+              vDel.disabled = isLocked;
+              vDel.addEventListener('click', function () {
+                if (isLocked) return;
+                vidList.splice(vaIdx, 1);
+                save({ study: settings.study });
+              });
+              vli.appendChild(vDel);
+              vidListUl.appendChild(vli);
+            });
+          }
+          vidSec.appendChild(vidListUl);
+
+          // Add video row
+          var vidAddRow = document.createElement('div');
+          vidAddRow.className = 'addrow';
+          vidAddRow.style.marginTop = '6px';
+          var vidInput = document.createElement('input');
+          vidInput.placeholder = 'Add video (youtube.com/watch?v=...)';
+          vidInput.style.fontSize = '12px';
+          vidInput.disabled = isLocked;
+          var vidAddBtn = document.createElement('button');
+          vidAddBtn.className = 'ytf-btn ytf-btn-secondary';
+          vidAddBtn.textContent = 'Add video';
+          vidAddBtn.style.fontSize = '12px';
+          vidAddBtn.disabled = isLocked;
+          vidAddBtn.addEventListener('click', function () {
+            if (isLocked) return;
+            var vRaw = (vidInput.value || '').trim();
+            if (!vRaw) return;
+            var m = vRaw.match(/[?&]v=([\w-]{6,})|\/shorts\/([\w-]{6,})|^([\w-]{11})$/);
+            var vidId = m ? (m[1] || m[2] || m[3]) : null;
+            if (!vidId) { vidInput.focus(); return; }
+            vidInput.value = '';
+            e.allowedVideos = e.allowedVideos || [];
+            e.allowedVideos.push({ id: vidId, url: vRaw });
+            save({ study: settings.study });
+          });
+          vidAddRow.appendChild(vidInput);
+          vidAddRow.appendChild(vidAddBtn);
+          vidSec.appendChild(vidAddRow);
+          body.appendChild(vidSec);
+
+          var footNote = document.createElement('div');
+          footNote.className = 'ytf-caption';
+          footNote.style.marginTop = '10px';
+          footNote.textContent = 'Channels and videos in your Global Study Allowlist are also automatically permitted during this schedule.';
+          body.appendChild(footNote);
+
+          card.appendChild(body);
+          sl.appendChild(card);
         } catch (eSchItem) {
-          console.error('[YTFOCUS] Error rendering schedule row:', eSchItem);
+          console.error('[YTFOCUS] Error rendering schedule card:', eSchItem);
         }
       });
-    }
+    })();
 
     // Analytics: today, streaks, 14-day chart, history.
     (function renderAnalytics() {
@@ -978,6 +1242,7 @@
   }
 
   function init() {
+    setupTabs();
     store.getSettings().then(function (s) { settings = s; render(); });
 
     document.querySelectorAll('#modeGroup .ytf-pill').forEach(function (b) {
@@ -1323,9 +1588,13 @@
       }
       return false;
     }
-    function clearSchError() {
+    function clearSchErrors() {
       var errEl = $('schError');
       if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+      var sErr = $('schStrictErr');
+      if (sErr) { sErr.textContent = ''; sErr.style.display = 'none'; }
+      var nErr = $('schNotifyErr');
+      if (nErr) { nErr.textContent = ''; nErr.style.display = 'none'; }
     }
 
     // Schedule day picker (Mon–Fri preselected); toggle to choose days.
@@ -1333,15 +1602,35 @@
     if (schDayGroup) schDayGroup.addEventListener('click', function (ev) {
       var b = ev.target && ev.target.closest ? ev.target.closest('[data-schday]') : null;
       if (!b || b.disabled) return;
-      clearSchError();
+      clearSchErrors();
       b.classList.toggle('active');
     });
-    if ($('schFrom')) $('schFrom').addEventListener('input', clearSchError);
-    if ($('schTo')) $('schTo').addEventListener('input', clearSchError);
-    if ($('schMode')) $('schMode').addEventListener('change', clearSchError);
+    if ($('schFrom')) $('schFrom').addEventListener('input', clearSchErrors);
+    if ($('schTo')) $('schTo').addEventListener('input', clearSchErrors);
+    if ($('schMode')) $('schMode').addEventListener('change', clearSchErrors);
+    if ($('schName')) $('schName').addEventListener('input', clearSchErrors);
+
+    if ($('schStrict')) {
+      $('schStrict').addEventListener('change', function (e) {
+        clearSchErrors();
+        var box = $('boxSchStrictMin');
+        if (box) box.style.display = e.target.checked ? 'flex' : 'none';
+      });
+    }
+
+    if ($('schNotify')) {
+      $('schNotify').addEventListener('change', function (e) {
+        clearSchErrors();
+        var box = $('boxSchNotifyMin');
+        if (box) box.style.display = e.target.checked ? 'flex' : 'none';
+      });
+    }
+
+    if ($('schStrictMin')) $('schStrictMin').addEventListener('input', clearSchErrors);
+    if ($('schNotifyMin')) $('schNotifyMin').addEventListener('input', clearSchErrors);
 
     $('schAdd').addEventListener('click', function () {
-      clearSchError();
+      clearSchErrors();
       var days = [];
       document.querySelectorAll('#schDayGroup [data-schday].active').forEach(function (b) {
         var d = parseInt(b.getAttribute('data-schday'), 10);
@@ -1359,32 +1648,87 @@
         return;
       }
       var m = $('schMode').value || 'study';
-      if (['normal', 'restricted', 'study', 'full'].indexOf(m) === -1) m = 'study';
+      if (['study', 'restricted', 'full'].indexOf(m) === -1) m = 'study';
+
+      var isStrict = $('schStrict') ? !!$('schStrict').checked : false;
+      var strictMin = 60;
+      if (isStrict) {
+        var rawS = parseInt($('schStrictMin').value, 10);
+        if (isNaN(rawS) || rawS < 10 || rawS > 360) {
+          var sErr = $('schStrictErr');
+          if (sErr) {
+            sErr.textContent = 'Lock time must be between 10 and 360 minutes.';
+            sErr.style.display = 'block';
+          }
+          return;
+        }
+        strictMin = rawS;
+      }
+
+      var isNotify = $('schNotify') ? !!$('schNotify').checked : false;
+      var notifyMin = 15;
+      if (isNotify) {
+        var rawN = parseInt($('schNotifyMin').value, 10);
+        if (isNaN(rawN) || rawN < 1) {
+          var nErr = $('schNotifyErr');
+          if (nErr) {
+            nErr.textContent = 'Notification time must be at least 1 minute.';
+            nErr.style.display = 'block';
+          }
+          return;
+        }
+        if (isStrict && rawN >= strictMin) {
+          var nErr = $('schNotifyErr');
+          if (nErr) {
+            nErr.textContent = 'Pre-schedule notification (' + rawN + 'm) must be less than strict lock time (' + strictMin + 'm).';
+            nErr.style.display = 'block';
+          }
+          return;
+        }
+        notifyMin = rawN;
+      }
+
+      var nameVal = ($('schName') && $('schName').value ? $('schName').value.trim() : '');
+
       var proposed = {
+        id: 'sch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        name: nameVal,
         days: days.slice().sort(),
         from: fromVal,
         to: toVal,
-        mode: m
+        mode: m,
+        enabled: true,
+        strict: isStrict,
+        strictLockMinutes: strictMin,
+        notify: isNotify,
+        notifyMinutes: notifyMin,
+        allowedChannels: [],
+        allowedVideos: []
       };
+
       var existingList = (settings.study && settings.study.schedule) || [];
       for (var i = 0; i < existingList.length; i++) {
-        if (schedulesOverlap(proposed, existingList[i])) {
-          var ex = existingList[i];
+        var ex = existingList[i];
+        // Only active/enabled schedules block new schedules from overlapping
+        if (ex.enabled !== false && schedulesOverlap(proposed, ex)) {
           var dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
           var exDays = (ex.days || []).map(function (d) { return dayNames[d]; }).join(',');
           var modeLabels = (window.YTFOCUS.CONSTANTS || {}).MODE_LABELS || {};
           var exMode = modeLabels[ex.mode] || ex.mode;
+          var exLabel = ex.name ? ('"' + ex.name + '"') : (exMode + ' schedule');
           var errEl = $('schError');
           if (errEl) {
-            errEl.textContent = 'Cannot add schedule: overlaps with existing ' + exDays + ' ' + ex.from + '–' + ex.to + ' (' + exMode + ').';
+            errEl.textContent = 'Cannot add schedule: overlaps with existing active ' + exLabel + ' on ' + exDays + ' (' + ex.from + '–' + ex.to + ').';
             errEl.style.display = 'block';
           }
           return;
         }
       }
+
       settings.study = settings.study || {};
       settings.study.schedule = settings.study.schedule || [];
       settings.study.schedule.push(proposed);
+      if ($('schName')) $('schName').value = '';
       save({ study: settings.study });
     });
 

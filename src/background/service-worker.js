@@ -16,6 +16,7 @@ function timeToMin(t) {
 }
 
 function scheduleMatches(entry, now) {
+  if (!entry || entry.enabled === false) return false;
   try {
     var d = new Date(now);
     var day = d.getDay();

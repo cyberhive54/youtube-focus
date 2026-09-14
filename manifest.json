@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "YouTube Focus — Shorts & Distraction Blocker",
   "short_name": "YT Focus",
-  "version": "2.9.7",
+  "version": "3.0.0",
   "description": "Make YouTube useful without making it addictive. Block Shorts, feeds, recommendations. Study Mode with allowlist, schedules, limits.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwpXtqYrEqdeAqQJ5fjtpO+vNtI+ttQMk6hmYEddX4Mvqt3xdIzNbbpVHNljKRD3HQnsoxgb22K+sBnjBOWrpgyHSgvS+1snkjGM5tbBIHrRoI8GXtL9ofcKBza6dbokeHGe/d/pOqYPAe3w384poo8PdgmVHYTZNg4Qa26rb68agQrhfJrDK4bZHEkacpl1tdDP9QhqcLtynVe7GMXV2XBGRSBMSzy6AvoxVdpZ7+smjAm+Cpus/9FxgXkBr4br5lUgDfuTvS+H2Nt1G4aYLFzfqfSlLi1+oc8+SIWCTefNiv7Z/ZSxe7wSN3j3eB1KkI+Rti6luZ+PAujsRpISZHwIDAQAB",
   "minimum_chrome_version": "109",

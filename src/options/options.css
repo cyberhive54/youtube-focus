@@ -156,3 +156,209 @@ input[type=range] {
 .skip-link:focus { transform: translateY(0); }
 @media (max-width: 520px) { .page { padding: 16px 10px 40px; } }
 
+/* Segmented tab navigation */
+.ytf-tabs {
+  display: flex;
+  background: var(--ytf-fill-2);
+  border: 1px solid var(--ytf-separator);
+  border-radius: 14px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+.ytf-tab {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--ytf-text-2);
+  font-family: var(--ytf-font);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: center;
+}
+.ytf-tab:hover {
+  color: var(--ytf-text);
+}
+.ytf-tab.active {
+  background: var(--ytf-card);
+  color: var(--ytf-text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+/* Schedule manager & cards */
+.sch-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+.sch-card {
+  background: var(--ytf-fill-2);
+  border: 1px solid var(--ytf-separator);
+  border-radius: 16px;
+  padding: 14px 16px;
+  transition: border-color 0.2s ease, opacity 0.2s ease;
+}
+.sch-card.running {
+  border-color: rgba(52, 199, 89, 0.4);
+}
+.sch-card.strict-locked {
+  border-color: rgba(255, 149, 0, 0.4);
+}
+.sch-card.inactive {
+  opacity: 0.65;
+}
+.sch-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sch-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ytf-text);
+}
+.sch-card-summary {
+  font-size: 13px;
+  color: var(--ytf-text-2);
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.sch-badge-mode {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(10, 132, 255, 0.15);
+  color: var(--ytf-blue);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.sch-badge-strict {
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 149, 0, 0.15);
+  color: #e06c00;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.sch-badge-enabled {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ytf-text-2);
+  background: var(--ytf-card);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.sch-badge-disabled {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ytf-text-2);
+  background: transparent;
+  border: 1px dashed var(--ytf-separator);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.sch-expand-btn {
+  border: 0;
+  background: transparent;
+  color: var(--ytf-text-2);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+.sch-expand-btn:hover {
+  background: var(--ytf-card);
+  color: var(--ytf-text);
+}
+.sch-expand-btn.open {
+  transform: rotate(180deg);
+}
+.sch-card-body {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ytf-separator);
+}
+.sch-badge-notify {
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(88, 86, 214, 0.15);
+  color: #5856d6;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.sch-badge-running {
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(52, 199, 89, 0.18);
+  color: var(--ytf-success);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.sch-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sch-locked-banner {
+  background: rgba(255, 149, 0, 0.1);
+  border: 1px solid rgba(255, 149, 0, 0.25);
+  color: var(--ytf-text);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+.sch-allowlist-sec {
+  margin-top: 12px;
+}
+.sch-allowlist-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ytf-text);
+}
+.sch-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--ytf-card);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.sch-item code {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sch-item button {
+  border: 0;
+  background: transparent;
+  color: var(--ytf-danger);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.sch-item button:hover {
+  background: rgba(215, 0, 21, 0.08);
+}
+

@@ -19,6 +19,7 @@
   }
 
   function scheduleMatches(entry, now) {
+    if (!entry || entry.enabled === false) return false;
     // now: epoch ms. Uses LOCAL day/time of the browser.
     try {
       var d = new Date(now);
@@ -37,6 +38,97 @@
       if (mins < to) {
         var prevDay = (day + 6) % 7;
         return !entry.days || entry.days.indexOf(prevDay) !== -1 || entry.days.indexOf(day) !== -1;
+      }
+      return false;
+    } catch (e) { return false; }
+  }
+
+  function isScheduleStrictLocked(entry, now) {
+    if (!entry || !entry.strict || entry.enabled === false) return false;
+    try {
+      var d = new Date(now);
+      var day = d.getDay();
+      var mins = d.getHours() * 60 + d.getMinutes();
+      var from = timeToMin(entry.from);
+      var days = entry.days || [];
+      if (!days.length) return false;
+
+      // Active running check
+      if (scheduleMatches(entry, now)) return true;
+
+      // User-configurable pre-commitment window (10 to 360 mins, default 60)
+      var lockBuffer = parseInt(entry.strictLockMinutes, 10);
+      if (isNaN(lockBuffer) || lockBuffer < 10) lockBuffer = 60;
+      if (lockBuffer > 360) lockBuffer = 360;
+
+      var lockFrom = from - lockBuffer;
+      if (lockFrom >= 0) {
+        if (days.indexOf(day) !== -1 && mins >= lockFrom && mins < from) return true;
+      } else {
+        var rolledFrom = lockFrom + 1440;
+        var nextDay = (day + 1) % 7;
+        if (days.indexOf(nextDay) !== -1 && mins >= rolledFrom) return true;
+        if (days.indexOf(day) !== -1 && mins < from) return true;
+      }
+      return false;
+    } catch (e) { return false; }
+  }
+
+  function scheduleStrictMinutesRemaining(entry, now) {
+    if (!entry || !entry.strict || entry.enabled === false) return null;
+    try {
+      var d = new Date(now);
+      var day = d.getDay();
+      var mins = d.getHours() * 60 + d.getMinutes();
+      var from = timeToMin(entry.from);
+      var days = entry.days || [];
+      if (!days.length) return null;
+      if (scheduleMatches(entry, now)) return 0; // Already running
+
+      var lockBuffer = parseInt(entry.strictLockMinutes, 10);
+      if (isNaN(lockBuffer) || lockBuffer < 10) lockBuffer = 60;
+      if (lockBuffer > 360) lockBuffer = 360;
+
+      var lockFrom = from - lockBuffer;
+      if (lockFrom >= 0) {
+        if (days.indexOf(day) !== -1 && mins >= lockFrom && mins < from) {
+          return from - mins;
+        }
+      } else {
+        var rolledFrom = lockFrom + 1440;
+        var nextDay = (day + 1) % 7;
+        if (days.indexOf(nextDay) !== -1 && mins >= rolledFrom) {
+          return (1440 - mins) + from;
+        }
+        if (days.indexOf(day) !== -1 && mins < from) {
+          return from - mins;
+        }
+      }
+      return null;
+    } catch (e) { return null; }
+  }
+
+  function isScheduleDueNotification(entry, now) {
+    if (!entry || !entry.notify || entry.enabled === false) return false;
+    try {
+      var d = new Date(now);
+      var day = d.getDay();
+      var mins = d.getHours() * 60 + d.getMinutes();
+      var from = timeToMin(entry.from);
+      var days = entry.days || [];
+      if (!days.length) return false;
+
+      var notifyMin = parseInt(entry.notifyMinutes, 10);
+      if (isNaN(notifyMin) || notifyMin < 1) notifyMin = 15;
+
+      var notifyFrom = from - notifyMin;
+      if (notifyFrom >= 0) {
+        if (days.indexOf(day) !== -1 && mins >= notifyFrom && mins < from) return true;
+      } else {
+        var rolledFrom = notifyFrom + 1440;
+        var nextDay = (day + 1) % 7;
+        if (days.indexOf(nextDay) !== -1 && mins >= rolledFrom) return true;
+        if (days.indexOf(day) !== -1 && mins < from) return true;
       }
       return false;
     } catch (e) { return false; }
@@ -72,39 +164,55 @@
   }
 
   function effectiveMode(settings, now) {
+    // Full is the strictest — explicit Full Block always wins.
+    if (settings && settings.mode === 'full') return 'full';
     var sm = scheduledMode(settings, now);
+    if (sm === 'full') return 'full';
     // Explicit study timer always wins if active.
     if (settings && settings.study && settings.study.manualUntil && now < settings.study.manualUntil) return 'study';
     var override = settings && settings.study && settings.study.scheduleOverrideMode;
     if (sm && override && isModeTransitionAllowed(sm, override)) {
       if (override === 'study') return 'study';
       if (sm === 'full' && override !== 'study') return 'full';
-      if (settings.mode === 'full') return 'full';
       return override;
     }
-    // Full is the strictest — explicit Full Block always wins.
-    if (sm === 'full' || (settings && settings.mode === 'full')) return 'full';
     if (sm) return sm;
     return (settings && settings.mode) || 'normal';
   }
 
-  function isVideoAllowlisted(settings, videoId) {
+  function isVideoAllowlisted(settings, videoId, now) {
     if (!videoId) return false;
-    var vs = (settings.study && settings.study.allowedVideos) || [];
+    var vs = (settings && settings.study && settings.study.allowedVideos) || [];
     for (var i = 0; i < vs.length; i++) {
-      if (vs[i].id === videoId || vs[i].url && vs[i].url.indexOf(videoId) !== -1) return true;
+      if (vs[i].id === videoId || (vs[i].url && vs[i].url.indexOf(videoId) !== -1)) return true;
+    }
+    var sch = activeSchedule(settings, now || Date.now());
+    if (sch && sch.allowedVideos) {
+      for (var j = 0; j < sch.allowedVideos.length; j++) {
+        var sv = sch.allowedVideos[j];
+        if (sv.id === videoId || (sv.url && sv.url.indexOf(videoId) !== -1)) return true;
+      }
     }
     return false;
   }
 
-  function isChannelAllowlisted(settings, ctx) {
-    var list = (settings.study && settings.study.allowedChannels) || [];
-    if (!list.length) return false;
-    for (var i = 0; i < list.length; i++) {
-      var a = list[i];
+  function isChannelAllowlisted(settings, ctx, now) {
+    var list = (settings && settings.study && settings.study.allowedChannels) || [];
+    function matchChan(a) {
+      if (!a) return false;
       if (ctx.channelId && a.id && ctx.channelId === a.id) return true;
       if (ctx.handle && a.handle && ctx.handle.toLowerCase() === String(a.handle).toLowerCase()) return true;
       if (ctx.channelUrl && a.url && ctx.channelUrl.toLowerCase() === String(a.url).toLowerCase()) return true;
+      return false;
+    }
+    for (var i = 0; i < list.length; i++) {
+      if (matchChan(list[i])) return true;
+    }
+    var sch = activeSchedule(settings, now || ctx.now || Date.now());
+    if (sch && sch.allowedChannels) {
+      for (var j = 0; j < sch.allowedChannels.length; j++) {
+        if (matchChan(sch.allowedChannels[j])) return true;
+      }
     }
     return false;
   }
@@ -454,6 +562,9 @@
     governance: governance,
     shortsRuleFor: shortsRuleFor,
     isVideoAllowlisted: isVideoAllowlisted,
-    isChannelAllowlisted: isChannelAllowlisted
+    isChannelAllowlisted: isChannelAllowlisted,
+    isScheduleStrictLocked: isScheduleStrictLocked,
+    scheduleStrictMinutesRemaining: scheduleStrictMinutesRemaining,
+    isScheduleDueNotification: isScheduleDueNotification
   };
 })();

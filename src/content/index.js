@@ -584,6 +584,36 @@
     chrome.storage.local.set({ usage: settings.usage }).catch(function () {});
   }
 
+  var notifiedSchedulesToday = {};
+
+  function checkScheduleNotifications(now) {
+    try {
+      var schList = (settings && settings.study && settings.study.schedule) || [];
+      if (!schList.length) return;
+      var today = (window.YTFOCUS.store && window.YTFOCUS.store.todayKey)
+        ? window.YTFOCUS.store.todayKey(new Date(now)) : '';
+      for (var i = 0; i < schList.length; i++) {
+        var e = schList[i];
+        if (!e || !e.notify || e.enabled === false) continue;
+        var schId = e.id || ('sch_' + e.from + '_' + e.to + '_' + (e.days || []).join(','));
+        var key = schId + '_' + today;
+        if (notifiedSchedulesToday[key]) continue;
+        if (window.YTFOCUS.policy && window.YTFOCUS.policy.isScheduleDueNotification(e, now)) {
+          notifiedSchedulesToday[key] = true;
+          var minsLeft = e.notifyMinutes || 15;
+          if (window.YTFOCUS.overlay && window.YTFOCUS.overlay.showCenterNotification) {
+            window.YTFOCUS.overlay.showCenterNotification({
+              title: e.name || 'Upcoming Schedule',
+              mode: e.mode || 'study',
+              minutes: minsLeft,
+              from: e.from
+            });
+          }
+        }
+      }
+    } catch (err) {}
+  }
+
   function startHeartbeat() {
     setInterval(function () {
       if (!settings) return;
@@ -618,6 +648,8 @@
         }
         // Terminal latch: quota exhausted + emergency spent.
         maybeLatchTerminal(now);
+        // Schedule notification check (center popup 5s)
+        checkScheduleNotifications(now);
         // Usage accrual.
         if (!heartbeatActive()) return;
         if (!pol.isBlockingActive(settings)) return;

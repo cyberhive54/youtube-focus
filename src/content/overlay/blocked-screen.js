@@ -643,6 +643,96 @@
     } catch (e) { return false; }
   }
 
+  var NOTIFY_HOST_ID = 'yt-focus-center-notify';
+
+  // 5-second center notification popup with 'x' close button for upcoming schedules
+  function showCenterNotification(opts) {
+    opts = opts || {};
+    try {
+      ensureFont();
+      var old = document.getElementById(NOTIFY_HOST_ID);
+      if (old) old.remove();
+
+      var det = window.YTFOCUS.detector;
+      var dark = det ? det.detectYouTubeDark() : false;
+
+      var host = document.createElement('div');
+      host.id = NOTIFY_HOST_ID;
+      host.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2147483647;pointer-events:auto;';
+      document.documentElement.appendChild(host);
+
+      var root = host.attachShadow({ mode: 'open' });
+      var style = document.createElement('style');
+      var cssText = window.YTFOCUS.shadowStyles || '';
+      try {
+        var fontUrl = (chrome.runtime && chrome.runtime.getURL)
+          ? chrome.runtime.getURL('assets/fonts/Inter-var-latin.woff2') : '';
+        if (fontUrl) cssText = cssText.split('%%YTF_FONT_URL%%').join(fontUrl);
+      } catch (e) {}
+
+      style.textContent = cssText +
+        '.ytf-notify-card{font-family:"YTF Inter",-apple-system,BlinkMacSystemFont,sans-serif;width:340px;max-width:92vw;' +
+        'padding:18px 20px;border-radius:18px;border:1px solid rgba(120,120,128,0.28);' +
+        'box-shadow:0 16px 40px rgba(0,0,0,0.35);box-sizing:border-box;animation:ytfFadeIn 0.25s cubic-bezier(0.16,1,0.3,1);}' +
+        '@keyframes ytfFadeIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}' +
+        '.ytf-notify-wrap[data-theme="light"] .ytf-notify-card{background:rgba(255,255,255,0.96);backdrop-filter:blur(20px);color:#1d1d1f;}' +
+        '.ytf-notify-wrap[data-theme="dark"] .ytf-notify-card{background:rgba(30,30,32,0.96);backdrop-filter:blur(20px);color:#f5f5f7;}' +
+        '.ytf-notify-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}' +
+        '.ytf-notify-tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#0a84ff;}' +
+        '.ytf-notify-close{border:0;background:rgba(120,120,128,0.15);color:inherit;font-size:15px;line-height:1;width:24px;height:24px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;}' +
+        '.ytf-notify-close:hover{background:rgba(120,120,128,0.3);}' +
+        '.ytf-notify-title{font-size:16px;font-weight:700;line-height:1.25;margin:0 0 6px 0;}' +
+        '.ytf-notify-desc{font-size:13px;line-height:1.45;color:rgba(120,120,128,0.9);margin:0;}' +
+        '.ytf-notify-wrap[data-theme="dark"] .ytf-notify-desc{color:#a1a1a6;}' +
+        '.ytf-notify-time{font-weight:700;color:inherit;}';
+
+      root.appendChild(style);
+
+      var title = opts.title || 'Upcoming Focus Schedule';
+      var timeText = opts.from ? (' at ' + opts.from) : '';
+      var mins = (opts.minutes !== undefined && opts.minutes !== null) ? opts.minutes : 15;
+      var modeLabels = (window.YTFOCUS.CONSTANTS || {}).MODE_LABELS || {};
+      var modeText = modeLabels[opts.mode] || (opts.mode ? (opts.mode.charAt(0).toUpperCase() + opts.mode.slice(1)) : 'Focus');
+
+      var wrap = document.createElement('div');
+      wrap.className = 'ytf-notify-wrap';
+      wrap.setAttribute('data-theme', dark ? 'dark' : 'light');
+      wrap.innerHTML =
+        '<div class="ytf-notify-card" role="alert" aria-live="assertive">' +
+          '<div class="ytf-notify-hdr">' +
+            '<span class="ytf-notify-tag">🔔 ' + esc(modeText) + '</span>' +
+            '<button type="button" class="ytf-notify-close" aria-label="Close notification">✕</button>' +
+          '</div>' +
+          '<h3 class="ytf-notify-title">' + esc(title) + '</h3>' +
+          '<p class="ytf-notify-desc">Starts in <span class="ytf-notify-time">' + mins + ' minute' + (mins === 1 ? '' : 's') + '</span>' + esc(timeText) + '. Prepare to focus!</p>' +
+        '</div>';
+
+      root.appendChild(wrap);
+
+      var timerId = setTimeout(function () {
+        dismiss();
+      }, 5000);
+
+      function dismiss() {
+        if (timerId) { clearTimeout(timerId); timerId = null; }
+        try {
+          var h = document.getElementById(NOTIFY_HOST_ID);
+          if (h) h.remove();
+        } catch (e3) {}
+      }
+
+      var closeBtn = wrap.querySelector('.ytf-notify-close');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          dismiss();
+        });
+      }
+
+      return true;
+    } catch (e) { return false; }
+  }
+
   window.YTFOCUS = window.YTFOCUS || {};
   window.YTFOCUS.overlay = {
     showBlockedScreen: showBlockedScreen,
@@ -652,6 +742,7 @@
     showInlineCard: showInlineCard,
     hideInlineCard: hideInlineCard,
     inlineIsShown: inlineIsShown,
-    showReminderToast: showReminderToast
+    showReminderToast: showReminderToast,
+    showCenterNotification: showCenterNotification
   };
 })();

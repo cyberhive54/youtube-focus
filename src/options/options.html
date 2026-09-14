@@ -20,6 +20,12 @@
     <span class="badge" id="modeBadge">normal</span>
   </header>
 
+  <nav class="ytf-tabs" role="tablist" aria-label="Settings navigation">
+    <button class="ytf-tab active" id="tabFocus" role="tab" aria-selected="true" aria-controls="paneFocus" type="button">Focus &amp; Limits</button>
+    <button class="ytf-tab" id="tabSchedules" role="tab" aria-selected="false" aria-controls="paneSchedules" type="button">Schedules <span class="badge" id="schCountBadge" style="margin-left:6px;font-size:11px">0</span></button>
+  </nav>
+
+  <div id="paneFocus" class="ytf-tab-pane" role="tabpanel" aria-labelledby="tabFocus">
   <section class="ytf-card block intro">
     <h2 class="ytf-headline">Start here</h2>
     <p class="ytf-body">Choose a simple starting plan below. You can customize the optional controls later.</p>
@@ -66,28 +72,6 @@
       <li><strong>Full Block:</strong> only Watch Later and YouTube Studio remain available.</li>
     </ul>
     <div class="ytf-body" id="focusStatus" style="margin-top:10px">–</div>
-  </section>
-
-  <section class="ytf-card block">
-    <h2 class="ytf-headline">Schedule</h2>
-    <p class="ytf-caption">Turn modes on automatically. Local time. While a schedule runs, blocking turns on automatically and cannot be switched off. Overlapping schedules are rejected.</p>
-    <ul class="list" id="schList"></ul>
-    <div class="addrow wrap">
-      <select id="schMode"><option value="normal">Normal</option><option value="restricted">Restricted</option><option value="study" selected>Study</option><option value="full">Full Block</option></select>
-      <input id="schFrom" type="time" value="09:00">
-      <input id="schTo" type="time" value="17:00">
-      <button class="ytf-btn ytf-btn-secondary" id="schAdd">Add schedule</button>
-    </div>
-    <div class="ytf-pill-group" id="schDayGroup" style="padding:8px 0 0">
-      <button class="ytf-pill active" data-schday="1">Mon</button>
-      <button class="ytf-pill active" data-schday="2">Tue</button>
-      <button class="ytf-pill active" data-schday="3">Wed</button>
-      <button class="ytf-pill active" data-schday="4">Thu</button>
-      <button class="ytf-pill active" data-schday="5">Fri</button>
-      <button class="ytf-pill" data-schday="6">Sat</button>
-      <button class="ytf-pill" data-schday="0">Sun</button>
-    </div>
-    <div id="schError" class="ytf-caption" style="display:none;color:#d70015;margin-top:8px;font-weight:500" role="alert"></div>
   </section>
 
   <section class="ytf-card block">
@@ -332,6 +316,87 @@
       <p class="ytf-caption">If YouTube changes its layout and something stops hiding, reload the extension on the extensions page, then refresh the YouTube tab.</p>
     </details>
   </section>
+  </div><!-- /#paneFocus -->
+
+  <div id="paneSchedules" class="ytf-tab-pane" role="tabpanel" aria-labelledby="tabSchedules" style="display:none">
+    <section class="ytf-card block">
+      <h2 class="ytf-headline">Add schedule</h2>
+      <p class="ytf-caption">Automate your focus modes. Local time. Each schedule can enforce Study, Restricted, or Full Block mode, and can have its own independent channel and video allowlists.</p>
+
+      <div style="margin-top:12px">
+        <label for="schName" class="ytf-caption" style="display:block;font-weight:600;margin-bottom:4px">Schedule name (optional)</label>
+        <input id="schName" type="text" placeholder="e.g. DSA Practice, Physics Deep Work, Morning Focus" style="width:100%;box-sizing:border-box">
+      </div>
+
+      <div class="addrow wrap" style="margin-top:10px">
+        <select id="schMode">
+          <option value="study" selected>Study Mode</option>
+          <option value="restricted">Restricted Mode</option>
+          <option value="full">Full Block Mode</option>
+        </select>
+        <input id="schFrom" type="time" value="09:00" aria-label="Start time">
+        <input id="schTo" type="time" value="17:00" aria-label="End time">
+        <button class="ytf-btn ytf-btn-primary" id="schAdd">Add schedule</button>
+      </div>
+
+      <div class="ytf-pill-group" id="schDayGroup" style="padding:10px 0 0">
+        <button class="ytf-pill active" data-schday="1">Mon</button>
+        <button class="ytf-pill active" data-schday="2">Tue</button>
+        <button class="ytf-pill active" data-schday="3">Wed</button>
+        <button class="ytf-pill active" data-schday="4">Thu</button>
+        <button class="ytf-pill active" data-schday="5">Fri</button>
+        <button class="ytf-pill" data-schday="6">Sat</button>
+        <button class="ytf-pill" data-schday="0">Sun</button>
+      </div>
+
+      <div class="ytf-divider"></div>
+
+      <!-- Strict Mode Config -->
+      <div class="ytf-row" style="padding-left:0;padding-right:0">
+        <div>
+          <strong>Strict Mode</strong>
+          <div class="ytf-caption">Locks allowlist, schedule status, and times before start through end of schedule.</div>
+        </div>
+        <label class="ytf-switch"><input type="checkbox" id="schStrict"><span class="track"></span><span class="thumb"></span></label>
+      </div>
+      <div id="boxSchStrictMin" style="display:none;align-items:center;justify-content:space-between;gap:12px;margin-top:6px;padding:8px 12px;background:var(--ytf-fill-2);border-radius:10px">
+        <div>
+          <strong style="font-size:13px">Lock settings before start (minutes)</strong>
+          <div class="ytf-caption">10 to 360 minutes before start time.</div>
+        </div>
+        <input id="schStrictMin" type="number" min="10" max="360" value="60" style="width:75px">
+      </div>
+      <div id="schStrictErr" class="ytf-caption" style="display:none;color:#d70015;margin-top:4px;font-weight:500" role="alert"></div>
+
+      <div class="ytf-divider"></div>
+
+      <!-- Notification Config -->
+      <div class="ytf-row" style="padding-left:0;padding-right:0">
+        <div>
+          <strong>Pre-schedule notification</strong>
+          <div class="ytf-caption">Shows a 5-second center notification popup on YouTube before the schedule starts.</div>
+        </div>
+        <label class="ytf-switch"><input type="checkbox" id="schNotify"><span class="track"></span><span class="thumb"></span></label>
+      </div>
+      <div id="boxSchNotifyMin" style="display:none;align-items:center;justify-content:space-between;gap:12px;margin-top:6px;padding:8px 12px;background:var(--ytf-fill-2);border-radius:10px">
+        <div>
+          <strong style="font-size:13px">Notify time before start (minutes)</strong>
+          <div class="ytf-caption">Must be less than Strict lock minutes if Strict Mode is on.</div>
+        </div>
+        <input id="schNotifyMin" type="number" min="1" max="359" value="15" style="width:75px">
+      </div>
+      <div id="schNotifyErr" class="ytf-caption" style="display:none;color:#d70015;margin-top:4px;font-weight:500" role="alert"></div>
+
+      <div id="schError" class="ytf-caption" style="display:none;color:#d70015;margin-top:10px;font-weight:600;padding:8px;background:rgba(215,0,21,0.08);border-radius:8px" role="alert"></div>
+    </section>
+
+    <section class="ytf-card block">
+      <h2 class="ytf-headline">Configured schedules</h2>
+      <p class="ytf-caption">Each schedule enforces its own mode and manages its own independent channel and video allowlist. While a schedule is actively running (or strict-locked), its allowlist and controls cannot be edited. When idle, you can add or remove allowed channels/videos immediately without midnight delays.</p>
+      <div class="sch-card-list" id="schList"></div>
+    </section>
+  </div>
+
   <div class="saved-pill" id="savedPill">✓ Saved — applied instantly</div>
   <dialog class="ytf-dialog" id="welcomeDialog" aria-labelledby="welcomeTitle">
     <form method="dialog" class="dialog-close"><button type="submit" aria-label="Close welcome setup">×</button></form>
