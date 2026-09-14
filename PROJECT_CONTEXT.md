@@ -1,4 +1,4 @@
-# PROJECT_CONTEXT.md — YouTube Focus handoff (v2.9.0)
+# PROJECT_CONTEXT.md — YouTube Focus handoff (v2.9.6)
 
 > Read this first, then inspect the referenced source files before modifying anything.
 > Code is the ultimate source of truth. Certainty labels: **CODE** = read in current
@@ -13,7 +13,7 @@
   with emergency allowance, terminal Full Block, Normal/Restricted/Study/Full modes,
   Shorts controls, Study allowlist, schedules, Strict lock with 30-min unlock cooldown,
   5-min unblocking cooldown, direct Study Mode escape hatch, local analytics/streaks.
-- **Version:** 2.9.0 (`manifest.json:5`; `VERSION.md` head row matches) — CODE.
+- **Version:** 2.9.6 (`manifest.json:5`; `VERSION.md` head row matches) — CODE.
 - **Platform:** MV3, permissions `storage` + `alarms` only, host `*.youtube.com`.
   No backend/accounts; no network calls in `src/` (grep fetch/XHR/Beacon: zero).
 - **Architecture:** pure policy engine decides; single orchestrator enforces via CSS

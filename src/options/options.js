@@ -453,7 +453,11 @@
 
     // Channels (edits stage as midnight-pending, never same-day).
     var ch = $('chList'); ch.innerHTML = '';
-    if (!(settings.study.allowedChannels || []).length) {
+    var hasChannels = (settings.study.allowedChannels || []).length > 0;
+    var hasPendingChannelAdds = (settings.study.pendingChanges || []).some(function (p) {
+      return p.op === 'add' && p.kind === 'channel';
+    });
+    if (!hasChannels && !hasPendingChannelAdds) {
       ch.innerHTML = '<li class="empty">No allowed channels yet — add your first study channel above.</li>';
     }
     (settings.study.allowedChannels || []).forEach(function (a, i) {
@@ -485,9 +489,37 @@
       }
       ch.appendChild(li);
     });
+    // Pending channel additions
+    (settings.study.pendingChanges || []).forEach(function (p, pI) {
+      if (p.op === 'add' && p.kind === 'channel') {
+        var li = document.createElement('li');
+        var a = p.value || {};
+        var label = a.handle || a.url || a.id || 'Unknown';
+        li.innerHTML = '<code></code>';
+        li.querySelector('code').textContent = label + (a.id && a.id !== label ? ' (' + a.id + ')' : '');
+        var pendBadge = document.createElement('span');
+        pendBadge.className = 'sch-badge-pending';
+        pendBadge.textContent = 'Addition pending (at midnight)';
+        li.appendChild(pendBadge);
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.style.color = 'var(--ytf-blue)';
+        cancelBtn.addEventListener('click', function () {
+          settings.study.pendingChanges.splice(pI, 1);
+          save({ study: settings.study });
+        });
+        li.appendChild(cancelBtn);
+        ch.appendChild(li);
+      }
+    });
 
     var vl = $('vidList'); vl.innerHTML = '';
-    if (!(settings.study.allowedVideos || []).length) {
+    var hasVideos = (settings.study.allowedVideos || []).length > 0;
+    var hasPendingVideoAdds = (settings.study.pendingChanges || []).some(function (p) {
+      return p.op === 'add' && p.kind === 'video';
+    });
+    if (!hasVideos && !hasPendingVideoAdds) {
       vl.innerHTML = '<li class="empty">No allowed videos yet — save specific videos you need.</li>';
     }
     (settings.study.allowedVideos || []).forEach(function (v, i) {
@@ -517,6 +549,29 @@
         li.appendChild(del);
       }
       vl.appendChild(li);
+    });
+    // Pending video additions
+    (settings.study.pendingChanges || []).forEach(function (p, pI) {
+      if (p.op === 'add' && p.kind === 'video') {
+        var li = document.createElement('li');
+        var v = p.value || {};
+        li.innerHTML = '<code></code>';
+        li.querySelector('code').textContent = v.url || v.id || 'Unknown';
+        var pendBadge = document.createElement('span');
+        pendBadge.className = 'sch-badge-pending';
+        pendBadge.textContent = 'Addition pending (at midnight)';
+        li.appendChild(pendBadge);
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.style.color = 'var(--ytf-blue)';
+        cancelBtn.addEventListener('click', function () {
+          settings.study.pendingChanges.splice(pI, 1);
+          save({ study: settings.study });
+        });
+        li.appendChild(cancelBtn);
+        vl.appendChild(li);
+      }
     });
 
     // Pending allowlist changes (activate at local midnight).
@@ -889,6 +944,13 @@
     });
     if (exists) return;
     settings.study.pendingChanges.push({ op: op, kind: kind, value: value, day: store.todayKey() });
+    if (op === 'add') {
+      var note = $('studySetupNote');
+      if (note) {
+        note.textContent = 'Added to pending allowlist. Will activate automatically at midnight (00:00).';
+        note.hidden = false;
+      }
+    }
     save({ study: settings.study });
   }
 
