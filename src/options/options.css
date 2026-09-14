@@ -33,7 +33,7 @@
 .ytf-dialog h2 { margin: 0 28px 10px 0; }
 .ytf-dialog p { margin: 0 0 12px; }
 .ytf-dialog label { display: block; font-size: 14px; font-weight: 600; margin: 14px 0 6px; }
-.ytf-dialog input { width: 100%; min-height: 44px; border: 1px solid var(--ytf-separator); border-radius: 12px; background: var(--ytf-bg); color: var(--ytf-text); padding: 10px 12px; font: inherit; }
+.ytf-dialog input { width: 100%; min-height: 44px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; background: rgba(255, 255, 255, 0.07); color: var(--ytf-text); padding: 10px 14px; font: inherit; }
 .dialog-close { position: absolute; right: 12px; top: 12px; }
 .dialog-close button { width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--ytf-fill-2); color: var(--ytf-text); cursor: pointer; font-size: 22px; line-height: 1; }
 .help-list { margin: 12px 0 18px; padding-left: 22px; display: flex; flex-direction: column; gap: 9px; font-size: 14px; line-height: 20px; }
@@ -417,6 +417,16 @@ input[type=range] {
   background: rgba(215, 0, 21, 0.08);
 }
 
+/* Tabs and layout */
+.ytf-tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ytf-tab-pane[hidden] {
+  display: none !important;
+}
+
 /* Schedule modal dialog styles */
 .schedule-dialog {
   width: min(540px, calc(100vw - 32px));
@@ -433,5 +443,189 @@ input[type=range] {
   border: 1px solid var(--ytf-separator);
   border-radius: 14px;
   padding: 12px 14px;
+}
+
+/* Dialog inputs: Soft black styling */
+.ytf-dialog input[type="text"],
+.ytf-dialog input[type="time"],
+.ytf-dialog input[type="number"],
+.modal-section-card input {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--ytf-text);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-family: var(--ytf-font);
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.ytf-dialog input[type="text"]:hover,
+.ytf-dialog input[type="time"]:hover,
+.ytf-dialog input[type="number"]:hover,
+.modal-section-card input:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.ytf-dialog input[type="text"]:focus,
+.ytf-dialog input[type="time"]:focus,
+.ytf-dialog input[type="number"]:focus,
+.modal-section-card input:focus {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: var(--ytf-blue);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.25);
+  outline: none;
+}
+
+.schedule-dialog input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: light) {
+  .ytf-dialog input[type="text"],
+  .ytf-dialog input[type="time"],
+  .ytf-dialog input[type="number"],
+  .modal-section-card input {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.14);
+  }
+  .ytf-dialog input[type="text"]:hover,
+  .ytf-dialog input[type="time"]:hover,
+  .ytf-dialog input[type="number"]:hover,
+  .modal-section-card input:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+  .ytf-dialog input[type="text"]:focus,
+  .ytf-dialog input[type="time"]:focus,
+  .ytf-dialog input[type="number"]:focus,
+  .modal-section-card input:focus {
+    background: #ffffff;
+    border-color: var(--ytf-blue);
+  }
+  .schedule-dialog input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: none;
+  }
+}
+
+/* Apple Custom Select Component */
+.apple-select {
+  position: relative;
+  width: 100%;
+}
+.apple-select-trigger {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  color: var(--ytf-text);
+  font-family: var(--ytf-font);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.apple-select-trigger:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.apple-select-trigger:focus-visible,
+.apple-select.open .apple-select-trigger {
+  border-color: var(--ytf-blue);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.25);
+  outline: none;
+}
+.apple-select-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.apple-select-arrows {
+  display: flex;
+  align-items: center;
+  margin-left: 10px;
+  color: var(--ytf-text-2);
+  flex-shrink: 0;
+}
+.apple-select-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: rgba(36, 36, 38, 0.96);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
+  padding: 6px;
+  z-index: 1000;
+  overflow: hidden;
+}
+.apple-select.open .apple-select-dropdown {
+  display: block;
+  animation: appleMenuAppear 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes appleMenuAppear {
+  from { opacity: 0; transform: scale(0.97) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.apple-select-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ytf-text);
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+  user-select: none;
+}
+.apple-select-item:hover {
+  background: var(--ytf-blue);
+  color: #ffffff;
+}
+.apple-select-check {
+  width: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ytf-blue);
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+.apple-select-item.selected .apple-select-check {
+  opacity: 1;
+}
+.apple-select-item:hover .apple-select-check {
+  color: #ffffff;
+}
+.apple-select-item.selected {
+  font-weight: 600;
+}
+@media (prefers-color-scheme: light) {
+  .apple-select-trigger {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.12);
+  }
+  .apple-select-trigger:hover {
+    background: rgba(0, 0, 0, 0.07);
+  }
+  .apple-select-dropdown {
+    background: rgba(255, 255, 255, 0.96);
+    border-color: rgba(0, 0, 0, 0.12);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
 }
 

@@ -5,6 +5,8 @@
   var settings = null;
   var expandedSchedules = {};
   var editingScheduleId = null;
+  var pendingScheduleSave = null;
+  var pendingDeleteScheduleId = null;
   var currentTab = 'focus';
 
   function $(id) { return document.getElementById(id); }
@@ -20,13 +22,13 @@
       if (tab === 'schedules') {
         if (tabFocus) { tabFocus.classList.remove('active'); tabFocus.setAttribute('aria-selected', 'false'); }
         if (tabSchedules) { tabSchedules.classList.add('active'); tabSchedules.setAttribute('aria-selected', 'true'); }
-        if (paneFocus) paneFocus.style.display = 'none';
-        if (paneSchedules) paneSchedules.style.display = 'block';
+        if (paneFocus) { paneFocus.style.display = 'none'; paneFocus.hidden = true; }
+        if (paneSchedules) { paneSchedules.style.display = 'flex'; paneSchedules.hidden = false; }
       } else {
         if (tabFocus) { tabFocus.classList.add('active'); tabFocus.setAttribute('aria-selected', 'true'); }
         if (tabSchedules) { tabSchedules.classList.remove('active'); tabSchedules.setAttribute('aria-selected', 'false'); }
-        if (paneFocus) paneFocus.style.display = 'block';
-        if (paneSchedules) paneSchedules.style.display = 'none';
+        if (paneFocus) { paneFocus.style.display = 'flex'; paneFocus.hidden = false; }
+        if (paneSchedules) { paneSchedules.style.display = 'none'; paneSchedules.hidden = true; }
       }
     }
 
@@ -41,7 +43,7 @@
   function setDisabledAll() {
     var L = locked();
     document.querySelectorAll('input, button, select').forEach(function (el) {
-      if (el.id === 'sStrict' || el.id === 'btnCancelStrict' || el.id === 'btnCancelUnblock' || el.id === 'resetBtn' || el.closest('#resetDialog') || el.id === 'btnModalSchClose' || el.id === 'btnModalSchCancel') return;
+      if (el.id === 'sStrict' || el.id === 'btnCancelStrict' || el.id === 'btnCancelUnblock' || el.id === 'resetBtn' || el.closest('#resetDialog') || el.closest('#scheduleModal') || el.closest('#confirmImmediateScheduleDialog') || el.closest('#deleteScheduleConfirmDialog')) return;
       if (el.classList.contains('ytf-tab') || el.classList.contains('sch-expand-btn')) return;
       // Strict locks everything except Strict toggle itself (and reset with confirm).
       el.disabled = L;
@@ -199,6 +201,23 @@
     if (nErr) { nErr.textContent = ''; nErr.style.display = 'none'; }
   }
 
+  function syncAppleSelect(modeValue) {
+    var select = $('modalSchMode');
+    if (select) select.value = modeValue;
+    var items = document.querySelectorAll('#schModeDropdown .apple-select-item');
+    var label = $('schModeLabel');
+    items.forEach(function (item) {
+      var val = item.getAttribute('data-value');
+      var isSelected = (val === modeValue);
+      item.classList.toggle('selected', isSelected);
+      item.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+      if (isSelected && label) {
+        var textSpan = item.querySelector('.apple-select-text');
+        if (textSpan) label.textContent = textSpan.textContent;
+      }
+    });
+  }
+
   function openScheduleModal(itemToEdit) {
     clearModalSchErrors();
     var dlg = $('scheduleModal');
@@ -209,7 +228,7 @@
       if ($('modalSchTitle')) $('modalSchTitle').textContent = 'Edit schedule';
       if ($('btnModalSchSave')) $('btnModalSchSave').textContent = 'Save changes';
       if ($('modalSchName')) $('modalSchName').value = itemToEdit.name || '';
-      if ($('modalSchMode')) $('modalSchMode').value = itemToEdit.mode || 'study';
+      syncAppleSelect(itemToEdit.mode || 'study');
       if ($('modalSchFrom')) $('modalSchFrom').value = itemToEdit.from || '09:00';
       if ($('modalSchTo')) $('modalSchTo').value = itemToEdit.to || '17:00';
 
@@ -237,7 +256,7 @@
       if ($('modalSchTitle')) $('modalSchTitle').textContent = 'Add schedule';
       if ($('btnModalSchSave')) $('btnModalSchSave').textContent = 'Add schedule';
       if ($('modalSchName')) $('modalSchName').value = '';
-      if ($('modalSchMode')) $('modalSchMode').value = 'study';
+      syncAppleSelect('study');
       if ($('modalSchFrom')) $('modalSchFrom').value = '09:00';
       if ($('modalSchTo')) $('modalSchTo').value = '17:00';
 
@@ -259,6 +278,13 @@
       if ($('modalSchNotifyMin')) $('modalSchNotifyMin').value = 15;
     }
 
+    var customSelect = $('customSchModeSelect');
+    if (customSelect) {
+      customSelect.classList.remove('open');
+      var trigger = $('schModeTrigger');
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    }
+
     if (typeof dlg.showModal === 'function') {
       dlg.showModal();
     } else {
@@ -271,6 +297,12 @@
     if (!dlg) return;
     editingScheduleId = null;
     clearModalSchErrors();
+    var customSelect = $('customSchModeSelect');
+    if (customSelect) {
+      customSelect.classList.remove('open');
+      var trigger = $('schModeTrigger');
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    }
     if (typeof dlg.close === 'function') {
       dlg.close();
     } else {
@@ -868,8 +900,16 @@
           delBtn.title = isLocked ? 'Cannot delete schedule while running or strict-locked' : 'Delete schedule';
           delBtn.addEventListener('click', function () {
             if (isLocked) return;
-            settings.study.schedule.splice(i, 1);
-            save({ study: settings.study });
+            pendingDeleteScheduleId = sid;
+            var dlg = $('deleteScheduleConfirmDialog');
+            var desc = $('deleteScheduleDesc');
+            if (desc) {
+              desc.textContent = 'Are you sure you want to delete "' + titleText + '" (' + daysText + ' • ' + timeText + ')?';
+            }
+            if (dlg) {
+              if (typeof dlg.showModal === 'function') dlg.showModal();
+              else dlg.setAttribute('open', '');
+            }
           });
           actions.appendChild(delBtn);
 
@@ -1724,6 +1764,34 @@
     if ($('modalSchMode')) $('modalSchMode').addEventListener('change', clearModalSchErrors);
     if ($('modalSchName')) $('modalSchName').addEventListener('input', clearModalSchErrors);
 
+    var schModeTrigger = $('schModeTrigger');
+    var customSchModeSelect = $('customSchModeSelect');
+    if (schModeTrigger && customSchModeSelect) {
+      schModeTrigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var isOpen = customSchModeSelect.classList.toggle('open');
+        schModeTrigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+
+      document.querySelectorAll('#schModeDropdown .apple-select-item').forEach(function (item) {
+        item.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var val = item.getAttribute('data-value');
+          syncAppleSelect(val);
+          customSchModeSelect.classList.remove('open');
+          schModeTrigger.setAttribute('aria-expanded', 'false');
+          clearModalSchErrors();
+        });
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!customSchModeSelect.contains(e.target)) {
+          customSchModeSelect.classList.remove('open');
+          schModeTrigger.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+
     if ($('modalSchStrict')) {
       $('modalSchStrict').addEventListener('change', function (e) {
         clearModalSchErrors();
@@ -1842,6 +1910,93 @@
           }
         }
 
+        function executeSaveSchedule(toSave) {
+          settings.study = settings.study || {};
+          settings.study.schedule = settings.study.schedule || [];
+
+          if (editingScheduleId) {
+            var found = false;
+            for (var sIdx = 0; sIdx < settings.study.schedule.length; sIdx++) {
+              if (settings.study.schedule[sIdx].id === editingScheduleId) {
+                var target = settings.study.schedule[sIdx];
+                target.name = toSave.name;
+                target.days = toSave.days;
+                target.from = toSave.from;
+                target.to = toSave.to;
+                target.mode = toSave.mode;
+                target.strict = toSave.strict;
+                target.strictLockMinutes = toSave.strictLockMinutes;
+                target.notify = toSave.notify;
+                target.notifyMinutes = toSave.notifyMinutes;
+                found = true;
+                break;
+              }
+            }
+            if (!found) {
+              settings.study.schedule.push(toSave);
+            }
+          } else {
+            settings.study.schedule.push(toSave);
+          }
+
+          closeScheduleModal();
+          save({ study: settings.study });
+        }
+
+        var now = Date.now();
+        var willBeActiveNow = scheduleMatches(proposed, now);
+        var willBeStrictLockedNow = window.YTFOCUS.policy && window.YTFOCUS.policy.isScheduleStrictLocked
+          ? window.YTFOCUS.policy.isScheduleStrictLocked(proposed, now) : false;
+
+        if (proposed.enabled !== false && (willBeActiveNow || willBeStrictLockedNow)) {
+          pendingScheduleSave = proposed;
+          var dlg = $('confirmImmediateScheduleDialog');
+          var title = $('confirmImmediateTitle');
+          var desc = $('confirmImmediateDesc');
+          var note = $('confirmImmediateNote');
+
+          if (willBeActiveNow) {
+            if (title) title.textContent = '⚠️ Activate schedule immediately?';
+            if (desc) desc.textContent = 'The current time falls within this schedule\'s active window (' + proposed.from + '–' + proposed.to + ').';
+            if (note) note.innerHTML = '<strong>Important:</strong> As soon as this schedule is saved, <strong>focus blocking will activate immediately</strong> and this schedule will become <strong>locked from editing or deletion</strong> until it completes at ' + proposed.to + '.';
+          } else {
+            if (title) title.textContent = '⏳ Strict pre-lock begins immediately?';
+            if (desc) desc.textContent = 'This schedule starts at ' + proposed.from + ', and its ' + (proposed.strictLockMinutes || 60) + '-minute Strict Mode pre-lock is already in effect.';
+            if (note) note.innerHTML = '<strong>Important:</strong> As soon as this schedule is saved, settings and allowlists will be <strong>strict-locked immediately</strong> and cannot be modified until the schedule completes at ' + proposed.to + '.';
+          }
+
+          if (dlg) {
+            if (typeof dlg.showModal === 'function') dlg.showModal();
+            else dlg.setAttribute('open', '');
+          }
+          return;
+        }
+
+        executeSaveSchedule(proposed);
+      });
+    }
+
+    if ($('btnCancelImmediateSchedule')) {
+      $('btnCancelImmediateSchedule').addEventListener('click', function () {
+        pendingScheduleSave = null;
+        var dlg = $('confirmImmediateScheduleDialog');
+        if (dlg) {
+          if (typeof dlg.close === 'function') dlg.close();
+          else dlg.removeAttribute('open');
+        }
+      });
+    }
+
+    if ($('btnConfirmImmediateSchedule')) {
+      $('btnConfirmImmediateSchedule').addEventListener('click', function () {
+        if (!pendingScheduleSave) return;
+        var toSave = pendingScheduleSave;
+        pendingScheduleSave = null;
+        var dlg = $('confirmImmediateScheduleDialog');
+        if (dlg) {
+          if (typeof dlg.close === 'function') dlg.close();
+          else dlg.removeAttribute('open');
+        }
         settings.study = settings.study || {};
         settings.study.schedule = settings.study.schedule || [];
 
@@ -1850,28 +2005,63 @@
           for (var sIdx = 0; sIdx < settings.study.schedule.length; sIdx++) {
             if (settings.study.schedule[sIdx].id === editingScheduleId) {
               var target = settings.study.schedule[sIdx];
-              target.name = nameVal;
-              target.days = days.slice().sort();
-              target.from = fromVal;
-              target.to = toVal;
-              target.mode = m;
-              target.strict = isStrict;
-              target.strictLockMinutes = strictMin;
-              target.notify = isNotify;
-              target.notifyMinutes = notifyMin;
+              target.name = toSave.name;
+              target.days = toSave.days;
+              target.from = toSave.from;
+              target.to = toSave.to;
+              target.mode = toSave.mode;
+              target.strict = toSave.strict;
+              target.strictLockMinutes = toSave.strictLockMinutes;
+              target.notify = toSave.notify;
+              target.notifyMinutes = toSave.notifyMinutes;
               found = true;
               break;
             }
           }
           if (!found) {
-            settings.study.schedule.push(proposed);
+            settings.study.schedule.push(toSave);
           }
         } else {
-          settings.study.schedule.push(proposed);
+          settings.study.schedule.push(toSave);
         }
 
         closeScheduleModal();
         save({ study: settings.study });
+      });
+    }
+
+    if ($('btnCancelDeleteSchedule')) {
+      $('btnCancelDeleteSchedule').addEventListener('click', function () {
+        pendingDeleteScheduleId = null;
+        var dlg = $('deleteScheduleConfirmDialog');
+        if (dlg) {
+          if (typeof dlg.close === 'function') dlg.close();
+          else dlg.removeAttribute('open');
+        }
+      });
+    }
+
+    if ($('btnConfirmDeleteSchedule')) {
+      $('btnConfirmDeleteSchedule').addEventListener('click', function () {
+        if (!pendingDeleteScheduleId) return;
+        var list = (settings.study && settings.study.schedule) || [];
+        var idx = -1;
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].id === pendingDeleteScheduleId) {
+            idx = i;
+            break;
+          }
+        }
+        if (idx !== -1) {
+          list.splice(idx, 1);
+          save({ study: settings.study });
+        }
+        pendingDeleteScheduleId = null;
+        var dlg = $('deleteScheduleConfirmDialog');
+        if (dlg) {
+          if (typeof dlg.close === 'function') dlg.close();
+          else dlg.removeAttribute('open');
+        }
       });
     }
 
