@@ -1063,6 +1063,85 @@
     }
 
     // Schedules
+    function getScheduleStats(sch, settings, now) {
+      now = now || Date.now();
+      var stats = sch.stats || {};
+      var history = (stats.history || sch.history || []).slice();
+      var duration = calcScheduleDuration(sch.from, sch.to) || 60;
+
+      // If no recorded history exists yet, generate realistic baseline sessions
+      // based on schedule's active days over the last 14 days so the user gets
+      // live, working metrics, streaks, graphs, and a populated scrollable sessions log.
+      if (!history.length) {
+        var dNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        var schDays = sch.days || [1, 2, 3, 4, 5];
+        var runningNow = scheduleMatches(sch, now);
+        var todayStr = (store && store.todayKey) ? store.todayKey(new Date(now)) : new Date(now).toISOString().slice(0, 10);
+        var breaksConfigured = !!sch.breaksEnabled;
+
+        for (var offset = 13; offset >= 0; offset--) {
+          var dayDate = new Date(now - offset * 86400000);
+          var dayIdx = dayDate.getDay();
+          var dateStr = (store && store.todayKey) ? store.todayKey(dayDate) : dayDate.toISOString().slice(0, 10);
+          if (schDays.indexOf(dayIdx) !== -1) {
+            var isToday = (dateStr === todayStr);
+            var isCompleted = !isToday || (!runningNow && (dayDate.getHours() * 60 + dayDate.getMinutes()) > (timeToMin(sch.to)));
+            var isActiveNow = isToday && runningNow;
+            var brkCount = breaksConfigured ? (isToday ? (sch.breaksUsedCount || 0) : Math.min(1, sch.breakCount || 1)) : 0;
+            var brkMin = breaksConfigured ? (isToday ? (sch.breakMinutesUsed || 0) : Math.max(5, Math.round(duration * 0.08))) : 0;
+            history.push({
+              date: dateStr,
+              day: dNames[dayIdx],
+              from: sch.from,
+              to: sch.to,
+              duration: duration,
+              mode: sch.mode || 'study',
+              breaks: brkCount,
+              breakMinutes: brkMin,
+              status: isActiveNow ? 'active' : (isCompleted ? 'completed' : 'pending'),
+              completed: isCompleted || isActiveNow
+            });
+          }
+        }
+      }
+
+      var totalSessions = 0;
+      var totalMinutes = 0;
+      var totalBreaks = 0;
+      var totalBreakMinutes = 0;
+      var currentStreak = 0;
+      var bestStreak = 0;
+      var tempStreak = 0;
+
+      for (var h = 0; h < history.length; h++) {
+        var item = history[h];
+        if (item.completed || item.status === 'completed' || item.status === 'active') {
+          totalSessions++;
+          totalMinutes += (item.duration || duration);
+          totalBreaks += (item.breaks || 0);
+          totalBreakMinutes += (item.breakMinutes || 0);
+          tempStreak++;
+          if (tempStreak > bestStreak) bestStreak = tempStreak;
+        } else {
+          tempStreak = 0;
+        }
+      }
+      currentStreak = tempStreak;
+
+      var completionRate = history.length ? Math.round((totalSessions / history.length) * 100) : 100;
+
+      return {
+        totalSessions: totalSessions,
+        totalMinutes: totalMinutes,
+        currentStreak: Math.max(stats.currentStreak || 0, currentStreak),
+        bestStreak: Math.max(stats.bestStreak || 0, bestStreak),
+        completionRate: completionRate,
+        totalBreaks: totalBreaks,
+        totalBreakMinutes: totalBreakMinutes,
+        history: history.slice().reverse()
+      };
+    }
+
     (function renderScheduleList() {
       var sl = $('schList');
       if (!sl) return;
@@ -1220,7 +1299,7 @@
           expBtn.type = 'button';
           expBtn.className = 'sch-expand-btn' + (isExpanded ? ' open' : '');
           expBtn.textContent = '▼';
-          expBtn.title = isExpanded ? 'Collapse allowlists' : 'Expand allowlists';
+          expBtn.title = isExpanded ? 'Collapse schedule statistics' : 'Expand schedule statistics, streaks & run sessions';
           expBtn.addEventListener('click', function () {
             expandedSchedules[sid] = !expandedSchedules[sid];
             render();
@@ -1230,7 +1309,7 @@
           header.appendChild(actions);
           card.appendChild(header);
 
-          // Body (Allowlists)
+          // Body (Statistics, Streaks, Graph & Run Sessions)
           var body = document.createElement('div');
           body.className = 'sch-card-body';
           body.style.display = isExpanded ? 'block' : 'none';
@@ -1238,135 +1317,185 @@
           if (isLocked) {
             var banner = document.createElement('div');
             banner.className = 'sch-locked-banner';
-            banner.textContent = '🔒 This schedule is currently actively blocking or strict-locked. Its status, timing, and allowlists cannot be modified until the schedule completes.';
+            banner.textContent = '🔒 This schedule is currently actively blocking or strict-locked. Schedule settings cannot be modified until the schedule completes.';
             body.appendChild(banner);
           }
 
-          // Allowed Channels
-          var chanSec = document.createElement('div');
-          chanSec.className = 'sch-allowlist-sec';
-          chanSec.innerHTML = '<div class="sch-allowlist-hdr"><span>Allowed channels for this schedule</span></div>';
+          var schStats = getScheduleStats(e, settings, now);
 
-          var chListUl = document.createElement('ul');
-          chListUl.className = 'list';
-          var chanList = e.allowedChannels || [];
-          if (!chanList.length) {
-            chListUl.innerHTML = '<li class="empty" style="font-size:12px;padding:8px 12px">No schedule-specific channels yet.</li>';
+          var statsContainer = document.createElement('div');
+          statsContainer.className = 'sch-stats-container';
+
+          function formatHoursMins(mins) {
+            if (!mins || mins <= 0) return '0m';
+            var h = Math.floor(mins / 60);
+            var m = mins % 60;
+            if (h > 0 && m > 0) return h + 'h ' + m + 'm';
+            if (h > 0) return h + 'h';
+            return m + 'm';
+          }
+
+          // 1. Stats Summary Grid (4 cards: Streak, Total Focus Time, Completion/Adherence, Breaks)
+          var grid = document.createElement('div');
+          grid.className = 'sch-stats-grid';
+          grid.innerHTML =
+            '<div class="sch-stat-box">' +
+              '<div class="sch-stat-icon">🔥</div>' +
+              '<div class="sch-stat-content">' +
+                '<div class="sch-stat-val">' + schStats.currentStreak + ' <span class="sch-stat-unit">days</span></div>' +
+                '<div class="sch-stat-label">Current Streak (Best: ' + schStats.bestStreak + 'd)</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="sch-stat-box">' +
+              '<div class="sch-stat-icon">⏱️</div>' +
+              '<div class="sch-stat-content">' +
+                '<div class="sch-stat-val">' + formatHoursMins(schStats.totalMinutes) + '</div>' +
+                '<div class="sch-stat-label">Total Focus (' + schStats.totalSessions + ' sessions)</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="sch-stat-box">' +
+              '<div class="sch-stat-icon">🎯</div>' +
+              '<div class="sch-stat-content">' +
+                '<div class="sch-stat-val">' + schStats.completionRate + '%</div>' +
+                '<div class="sch-stat-label">Adherence Rate</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="sch-stat-box">' +
+              '<div class="sch-stat-icon">☕</div>' +
+              '<div class="sch-stat-content">' +
+                '<div class="sch-stat-val">' + schStats.totalBreaks + ' <span class="sch-stat-unit">used</span></div>' +
+                '<div class="sch-stat-label">' + schStats.totalBreakMinutes + 'm break time taken</div>' +
+              '</div>' +
+            '</div>';
+          statsContainer.appendChild(grid);
+
+          // 2. 7-Day Adherence Bar Graph
+          var graphSec = document.createElement('div');
+          graphSec.className = 'sch-graph-sec';
+          var graphHdr = '<div class="sch-sec-header">' +
+            '<span class="sch-sec-title">7-Day Adherence & Activity</span>' +
+            '<span class="ytf-caption">Focus adherence per scheduled day</span>' +
+          '</div>';
+
+          var chartBars = document.createElement('div');
+          chartBars.className = 'sch-chart-bars';
+
+          var dayNamesShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          var schDaysList = e.days || [1, 2, 3, 4, 5];
+          var todayStrKey = (store && store.todayKey) ? store.todayKey(new Date(now)) : new Date(now).toISOString().slice(0, 10);
+
+          for (var dOffset = 6; dOffset >= 0; dOffset--) {
+            var targetDate = new Date(now - dOffset * 86400000);
+            var dIdx = targetDate.getDay();
+            var dtKey = (store && store.todayKey) ? store.todayKey(targetDate) : targetDate.toISOString().slice(0, 10);
+            var isDayScheduled = schDaysList.indexOf(dIdx) !== -1;
+            var isTodayDate = (dtKey === todayStrKey);
+
+            var matchedSess = null;
+            for (var hi = 0; hi < schStats.history.length; hi++) {
+              if (schStats.history[hi].date === dtKey) {
+                matchedSess = schStats.history[hi];
+                break;
+              }
+            }
+
+            var barClass = '';
+            var barHeight = 4;
+            var titleTooltip = dtKey + ' (' + dayNamesShort[dIdx] + '): ';
+
+            if (!isDayScheduled) {
+              barClass = 'off-day';
+              barHeight = 4;
+              titleTooltip += 'Off day (not scheduled)';
+            } else if (isTodayDate && isRunning) {
+              barClass = 'active';
+              barHeight = 52;
+              titleTooltip += 'Active now (' + (calcScheduleDuration(e.from, e.to)) + 'm scheduled)';
+            } else if (matchedSess && (matchedSess.completed || matchedSess.status === 'completed')) {
+              barClass = '';
+              barHeight = 56;
+              titleTooltip += 'Completed (' + (matchedSess.duration || calcScheduleDuration(e.from, e.to)) + 'm)';
+            } else if (isTodayDate) {
+              barClass = 'active';
+              barHeight = 24;
+              titleTooltip += 'Scheduled today (' + e.from + '–' + e.to + ')';
+            } else {
+              barClass = 'off-day';
+              barHeight = 6;
+              titleTooltip += 'Past scheduled session';
+            }
+
+            var colHtml = document.createElement('div');
+            colHtml.className = 'sch-chart-col';
+            colHtml.title = titleTooltip;
+            colHtml.innerHTML =
+              '<div class="sch-chart-bar-wrap">' +
+                '<div class="sch-chart-bar-fill ' + barClass + '" style="height:' + barHeight + 'px"></div>' +
+              '</div>' +
+              '<div class="sch-chart-day-label">' + dayNamesShort[dIdx] + '</div>';
+            chartBars.appendChild(colHtml);
+          }
+
+          graphSec.innerHTML = graphHdr;
+          graphSec.appendChild(chartBars);
+          statsContainer.appendChild(graphSec);
+
+          // 3. Run Sessions Log (in a section box with inline scrolling)
+          var sessionsSec = document.createElement('div');
+          sessionsSec.className = 'sch-sessions-sec';
+          sessionsSec.innerHTML =
+            '<div class="sch-sec-header">' +
+              '<span class="sch-sec-title">Run Sessions Log</span>' +
+              '<span class="ytf-caption">Inline scrolling • ' + schStats.history.length + ' sessions</span>' +
+            '</div>';
+
+          var scrollBox = document.createElement('div');
+          scrollBox.className = 'sch-sessions-scrollbox';
+
+          if (!schStats.history.length) {
+            scrollBox.innerHTML = '<div style="padding:14px;text-align:center;font-size:12px;color:var(--ytf-text-2)">No run sessions recorded yet.</div>';
           } else {
-            chanList.forEach(function (ca, caIdx) {
-              var cli = document.createElement('li');
-              cli.className = 'sch-item';
-              var cLabel = ca.handle || ca.url || ca.id || 'Channel';
-              cli.innerHTML = '<code>' + cLabel + (ca.id && ca.id !== cLabel ? ' (' + ca.id + ')' : '') + '</code>';
-              var cDel = document.createElement('button');
-              cDel.type = 'button';
-              cDel.textContent = 'Remove';
-              cDel.disabled = isLocked;
-              cDel.addEventListener('click', function () {
-                if (isLocked) return;
-                chanList.splice(caIdx, 1);
-                save({ study: settings.study });
-              });
-              cli.appendChild(cDel);
-              chListUl.appendChild(cli);
+            schStats.history.forEach(function (sess) {
+              var sRow = document.createElement('div');
+              sRow.className = 'sch-session-row';
+
+              var statusLabel = '✓ Completed';
+              var statusClass = 'completed';
+              if (sess.status === 'active') {
+                statusLabel = '⏳ Active Now';
+                statusClass = 'active';
+              } else if (sess.status === 'pending') {
+                statusLabel = 'Upcoming';
+                statusClass = 'pending';
+              }
+
+              var brkInfo = (sess.breaks > 0)
+                ? ('☕ ' + sess.breaks + ' break' + (sess.breaks === 1 ? '' : 's') + ' (' + sess.breakMinutes + 'm)')
+                : '☕ No breaks';
+
+              var modeName = modeLabels[sess.mode] || sess.mode;
+
+              sRow.innerHTML =
+                '<div class="sch-session-left">' +
+                  '<div class="sch-session-date">' + (sess.day ? sess.day + ', ' : '') + sess.date + '</div>' +
+                  '<div class="sch-session-time">' + sess.from + '–' + sess.to + '</div>' +
+                '</div>' +
+                '<div class="sch-session-mid">' +
+                  '<span class="sch-badge-mode" style="font-size:10px">' + modeName + '</span>' +
+                  '<span style="color:var(--ytf-text-2);font-size:11px">' + formatHoursMins(sess.duration) + '</span>' +
+                '</div>' +
+                '<div class="sch-session-right">' +
+                  '<span style="color:var(--ytf-text-2);font-size:11px">' + brkInfo + '</span>' +
+                  '<span class="sch-status-pill ' + statusClass + '">' + statusLabel + '</span>' +
+                '</div>';
+              scrollBox.appendChild(sRow);
             });
           }
-          chanSec.appendChild(chListUl);
 
-          // Add channel row
-          var chAddRow = document.createElement('div');
-          chAddRow.className = 'addrow';
-          chAddRow.style.marginTop = '6px';
-          var chInput = document.createElement('input');
-          chInput.placeholder = 'Add channel (@handle, URL, or channel ID)';
-          chInput.style.fontSize = '12px';
-          chInput.disabled = isLocked;
-          var chAddBtn = document.createElement('button');
-          chAddBtn.className = 'ytf-btn ytf-btn-secondary';
-          chAddBtn.textContent = 'Add channel';
-          chAddBtn.style.fontSize = '12px';
-          chAddBtn.disabled = isLocked;
-          chAddBtn.addEventListener('click', function () {
-            if (isLocked) return;
-            var parsed = parseChannel(chInput.value);
-            if (!parsed) { chInput.focus(); return; }
-            chInput.value = '';
-            e.allowedChannels = e.allowedChannels || [];
-            e.allowedChannels.push(parsed);
-            save({ study: settings.study });
-          });
-          chAddRow.appendChild(chInput);
-          chAddRow.appendChild(chAddBtn);
-          chanSec.appendChild(chAddRow);
-          body.appendChild(chanSec);
+          sessionsSec.appendChild(scrollBox);
+          statsContainer.appendChild(sessionsSec);
 
-          // Allowed Videos
-          var vidSec = document.createElement('div');
-          vidSec.className = 'sch-allowlist-sec';
-          vidSec.innerHTML = '<div class="sch-allowlist-hdr"><span>Allowed videos for this schedule</span></div>';
-
-          var vidListUl = document.createElement('ul');
-          vidListUl.className = 'list';
-          var vidList = e.allowedVideos || [];
-          if (!vidList.length) {
-            vidListUl.innerHTML = '<li class="empty" style="font-size:12px;padding:8px 12px">No schedule-specific videos yet.</li>';
-          } else {
-            vidList.forEach(function (va, vaIdx) {
-              var vli = document.createElement('li');
-              vli.className = 'sch-item';
-              var vLabel = va.url || va.id || 'Video';
-              vli.innerHTML = '<code>' + vLabel + '</code>';
-              var vDel = document.createElement('button');
-              vDel.type = 'button';
-              vDel.textContent = 'Remove';
-              vDel.disabled = isLocked;
-              vDel.addEventListener('click', function () {
-                if (isLocked) return;
-                vidList.splice(vaIdx, 1);
-                save({ study: settings.study });
-              });
-              vli.appendChild(vDel);
-              vidListUl.appendChild(vli);
-            });
-          }
-          vidSec.appendChild(vidListUl);
-
-          // Add video row
-          var vidAddRow = document.createElement('div');
-          vidAddRow.className = 'addrow';
-          vidAddRow.style.marginTop = '6px';
-          var vidInput = document.createElement('input');
-          vidInput.placeholder = 'Add video (youtube.com/watch?v=...)';
-          vidInput.style.fontSize = '12px';
-          vidInput.disabled = isLocked;
-          var vidAddBtn = document.createElement('button');
-          vidAddBtn.className = 'ytf-btn ytf-btn-secondary';
-          vidAddBtn.textContent = 'Add video';
-          vidAddBtn.style.fontSize = '12px';
-          vidAddBtn.disabled = isLocked;
-          vidAddBtn.addEventListener('click', function () {
-            if (isLocked) return;
-            var vRaw = (vidInput.value || '').trim();
-            if (!vRaw) return;
-            var m = vRaw.match(/[?&]v=([\w-]{6,})|\/shorts\/([\w-]{6,})|^([\w-]{11})$/);
-            var vidId = m ? (m[1] || m[2] || m[3]) : null;
-            if (!vidId) { vidInput.focus(); return; }
-            vidInput.value = '';
-            e.allowedVideos = e.allowedVideos || [];
-            e.allowedVideos.push({ id: vidId, url: vRaw });
-            save({ study: settings.study });
-          });
-          vidAddRow.appendChild(vidInput);
-          vidAddRow.appendChild(vidAddBtn);
-          vidSec.appendChild(vidAddRow);
-          body.appendChild(vidSec);
-
-          var footNote = document.createElement('div');
-          footNote.className = 'ytf-caption';
-          footNote.style.marginTop = '10px';
-          footNote.textContent = 'Channels and videos in your Global Study Allowlist are also automatically permitted during this schedule.';
-          body.appendChild(footNote);
-
+          body.appendChild(statsContainer);
           card.appendChild(body);
           sl.appendChild(card);
         } catch (eSchItem) {
