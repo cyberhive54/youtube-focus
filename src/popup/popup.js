@@ -5,6 +5,7 @@
   var settings = null;
   var flashUntil = 0; // "Applied ✓" flash window after a local change
   var openedAt = Date.now(); // cooldown anchor: wait-to-click after popup opens
+  var selectedBreakDuration = 10;
 
   function $(id) { return document.getElementById(id); }
 
@@ -82,6 +83,18 @@
           }).then(function (s) { settings = s; render(); });
         }
         stBox.style.display = 'none';
+      }
+    }
+
+    var bTimer = $('schBreakTimer');
+    if (bTimer && settings.activeBreak) {
+      if (settings.activeBreak.endsAt > now) {
+        bTimer.textContent = formatRemaining(settings.activeBreak.endsAt - now);
+        needTicker = true;
+      } else {
+        chrome.storage.local.set({ activeBreak: null }).then(function () {
+          return store.getSettings();
+        }).then(function (s) { settings = s; render(); });
       }
     }
 
@@ -245,6 +258,78 @@
     }
     $('resumeBtn').style.display = granted ? '' : 'none';
 
+    // Schedule break card
+    var breakCard = $('schBreakCard');
+    var isBreak = false;
+    try { isBreak = window.YTFOCUS.policy && window.YTFOCUS.policy.isScheduleBreakActive(settings, now); } catch (eB) {}
+
+    if (breakCard) {
+      if (activeSch && sch && sch.breaksEnabled) {
+        breakCard.style.display = 'block';
+        var bActiveBox = $('schBreakActiveBox');
+        var bTriggerBox = $('schBreakTriggerBox');
+        if (isBreak) {
+          if (bActiveBox) bActiveBox.style.display = 'block';
+          if (bTriggerBox) bTriggerBox.style.display = 'none';
+          var bTimer = $('schBreakTimer');
+          var remBreakMs = Math.max(0, (settings.activeBreak && settings.activeBreak.endsAt || 0) - now);
+          if (bTimer) bTimer.textContent = formatRemaining(remBreakMs);
+          $('modeBadge').textContent = 'Break';
+          $('statusLine').textContent = (Date.now() < flashUntil ? '✓ Applied — ' : '') + '☕ Break active (' + formatRemaining(remBreakMs) + ')';
+        } else {
+          if (bActiveBox) bActiveBox.style.display = 'none';
+          if (bTriggerBox) bTriggerBox.style.display = 'block';
+          var totalBreakMin = sch.breakMinutes || 0;
+          var usedBreakMin = sch.breakMinutesUsed || 0;
+          var remBreakMin = Math.max(0, totalBreakMin - usedBreakMin);
+          var totalBreakCount = sch.breakCount || 0;
+          var usedBreakCount = sch.breaksUsedCount || 0;
+          var remBreakCount = Math.max(0, totalBreakCount - usedBreakCount);
+
+          var bSummary = $('schBreakSummary');
+          if (bSummary) {
+            bSummary.textContent = remBreakCount + ' break' + (remBreakCount === 1 ? '' : 's') + ' left · ' + remBreakMin + 'm remaining allowance';
+          }
+
+          var bChoices = $('schBreakChoices');
+          var startBtn = $('btnStartSchBreak');
+          if (bChoices) {
+            bChoices.innerHTML = '';
+            if (remBreakCount > 0 && remBreakMin > 0) {
+              var opts = [5, 10, 15, remBreakMin].filter(function (v, i, arr) {
+                return v > 0 && v <= remBreakMin && arr.indexOf(v) === i;
+              }).sort(function (a, b) { return a - b; });
+
+              opts.forEach(function (optVal) {
+                var btn = document.createElement('button');
+                btn.className = 'ytf-pill' + (selectedBreakDuration === optVal ? ' active' : '');
+                btn.textContent = (optVal === remBreakMin && opts.length > 1 ? 'All (' + optVal + 'm)' : optVal + 'm');
+                btn.addEventListener('click', function () {
+                  selectedBreakDuration = optVal;
+                  render();
+                });
+                bChoices.appendChild(btn);
+              });
+              if (!selectedBreakDuration || selectedBreakDuration > remBreakMin) {
+                selectedBreakDuration = opts[0];
+              }
+              if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.textContent = '☕ Start ' + selectedBreakDuration + ' min break';
+              }
+            } else {
+              bChoices.innerHTML = '<span class="ytf-caption">No breaks remaining for today.</span>';
+              if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.textContent = '☕ Break limit reached';
+              }
+            }
+          }
+        }
+      } else {
+        breakCard.style.display = 'none';
+      }
+    }
   }
 
   // Config writes go through the Strict filter; grant spends bypass it
@@ -430,6 +515,80 @@
     $('openOptions').addEventListener('click', function () {
       chrome.runtime.openOptionsPage();
     });
+
+    if ($('btnStartSchBreak')) {
+      $('btnStartSchBreak').addEventListener('click', function () {
+        var now = Date.now();
+        var sch = null;
+        try { sch = window.YTFOCUS.policy && window.YTFOCUS.policy.activeSchedule(settings, now); } catch (e) {}
+        if (!sch || !sch.breaksEnabled) return;
+        var totalBreakMin = sch.breakMinutes || 0;
+        var usedBreakMin = sch.breakMinutesUsed || 0;
+        var remBreakMin = Math.max(0, totalBreakMin - usedBreakMin);
+        var totalBreakCount = sch.breakCount || 0;
+        var usedBreakCount = sch.breaksUsedCount || 0;
+        var remBreakCount = Math.max(0, totalBreakCount - usedBreakCount);
+        if (remBreakCount <= 0 || remBreakMin <= 0) return;
+
+        var dur = Math.min(remBreakMin, selectedBreakDuration || 5);
+        var startedAt = now;
+        var endsAt = now + dur * 60 * 1000;
+
+        var updatedSchedules = (settings.schedules || []).map(function (s) {
+          if (s.id === sch.id) {
+            return Object.assign({}, s, {
+              breaksUsedCount: (s.breaksUsedCount || 0) + 1,
+              breakMinutesUsed: (s.breakMinutesUsed || 0) + dur
+            });
+          }
+          return s;
+        });
+
+        var activeBreak = {
+          scheduleId: sch.id,
+          startedAt: startedAt,
+          endsAt: endsAt,
+          durationMinutes: dur
+        };
+
+        chrome.storage.local.set({ schedules: updatedSchedules, activeBreak: activeBreak }).then(function () {
+          return store.getSettings();
+        }).then(function (s) {
+          settings = s;
+          flashUntil = Date.now() + 1500;
+          render();
+          chrome.runtime.sendMessage({ type: 'ytf:refresh-badge' }).catch(function () {});
+        }).catch(function () {});
+      });
+    }
+
+    if ($('btnEndSchBreak')) {
+      $('btnEndSchBreak').addEventListener('click', function () {
+        var now = Date.now();
+        if (!settings.activeBreak) return;
+        var ab = settings.activeBreak;
+        var elapsedMs = Math.max(0, now - (ab.startedAt || now));
+        var elapsedMin = Math.min(ab.durationMinutes || 0, Math.ceil(elapsedMs / 60000));
+        var refundMin = Math.max(0, (ab.durationMinutes || 0) - elapsedMin);
+
+        var updatedSchedules = (settings.schedules || []).map(function (s) {
+          if (s.id === ab.scheduleId) {
+            var newUsed = Math.max(0, (s.breakMinutesUsed || 0) - refundMin);
+            return Object.assign({}, s, { breakMinutesUsed: newUsed });
+          }
+          return s;
+        });
+
+        chrome.storage.local.set({ schedules: updatedSchedules, activeBreak: null }).then(function () {
+          return store.getSettings();
+        }).then(function (s) {
+          settings = s;
+          flashUntil = Date.now() + 1500;
+          render();
+          chrome.runtime.sendMessage({ type: 'ytf:refresh-badge' }).catch(function () {});
+        }).catch(function () {});
+      });
+    }
 
     $('resumeBtn').addEventListener('click', function () {
       // Early end refunds unused pool minutes (uses stay spent).Spend paths

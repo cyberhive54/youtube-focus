@@ -438,6 +438,46 @@
       </div>
     </div>
 
+    <!-- Study Mode Allowlist (shown when Study Mode is selected) -->
+    <div id="modalSchStudyAllowlistSec" class="modal-section-card" style="margin-top:14px">
+      <strong style="font-size:13.5px;display:block">Allowed channels &amp; videos for this schedule</strong>
+      <div class="ytf-caption" style="margin-top:2px">Only these channels and videos will play during this schedule (in addition to global Study allowlists).</div>
+
+      <!-- Schedule Channels -->
+      <div style="margin-top:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <label class="ytf-caption" style="font-weight:600">Allowed channels</label>
+          <span class="badge" id="modalSchChanCount" style="font-size:10px">0</span>
+        </div>
+        <ul class="list" id="modalSchChanList" style="max-height:130px;overflow-y:auto;margin:0 0 8px">
+          <li class="empty" style="font-size:12px;padding:6px 10px">No channels added yet.</li>
+        </ul>
+        <div class="addrow" style="margin-top:4px">
+          <input id="modalSchChanInput" type="text" placeholder="Add channel (@handle, URL, or channel ID)" style="font-size:12px">
+          <button type="button" class="ytf-btn ytf-btn-secondary" id="btnModalSchAddChan" style="font-size:12px;white-space:nowrap">Add channel</button>
+        </div>
+        <div id="modalSchChanErr" class="ytf-inline-error" style="display:none" role="alert"></div>
+      </div>
+
+      <div class="ytf-divider" style="margin:12px 0"></div>
+
+      <!-- Schedule Videos -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <label class="ytf-caption" style="font-weight:600">Allowed videos</label>
+          <span class="badge" id="modalSchVidCount" style="font-size:10px">0</span>
+        </div>
+        <ul class="list" id="modalSchVidList" style="max-height:130px;overflow-y:auto;margin:0 0 8px">
+          <li class="empty" style="font-size:12px;padding:6px 10px">No videos added yet.</li>
+        </ul>
+        <div class="addrow" style="margin-top:4px">
+          <input id="modalSchVidInput" type="text" placeholder="Add video (youtube.com/watch?v=...)" style="font-size:12px">
+          <button type="button" class="ytf-btn ytf-btn-secondary" id="btnModalSchAddVid" style="font-size:12px;white-space:nowrap">Add video</button>
+        </div>
+        <div id="modalSchVidErr" class="ytf-inline-error" style="display:none" role="alert"></div>
+      </div>
+    </div>
+
     <div class="time-range-row" style="margin-top:14px">
       <div>
         <label for="modalSchFrom" class="ytf-caption" style="display:block;font-weight:600;margin-bottom:6px">Start time</label>
@@ -496,6 +536,33 @@
         <input id="modalSchNotifyMin" type="number" min="1" max="359" value="15" style="width:75px">
       </div>
       <div id="modalSchNotifyErr" class="ytf-inline-error" style="display:none" role="alert"></div>
+    </div>
+
+    <div class="modal-section-card" style="margin-top:12px">
+      <div class="ytf-row" style="padding:0">
+        <div>
+          <strong>Schedule breaks</strong>
+          <div class="ytf-caption">Allow temporary breaks to browse YouTube normally under global rules.</div>
+        </div>
+        <label class="ytf-switch"><input type="checkbox" id="modalSchBreaks"><span class="track"></span><span class="thumb"></span></label>
+      </div>
+      <div id="modalBoxBreaks" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--ytf-separator);flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div>
+            <strong style="font-size:13px">Total break time allowance (minutes)</strong>
+            <div class="ytf-caption" id="modalSchBreakMinHint">Up to 20% of schedule time (Strict OFF) or 10% (Strict ON).</div>
+          </div>
+          <input id="modalSchBreakMin" type="number" min="1" max="288" value="15" style="width:75px">
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div>
+            <strong style="font-size:13px">Number of breaks allowed</strong>
+            <div class="ytf-caption" id="modalSchBreakCountHint">1 to 20 breaks (Strict OFF) or 1 to 10 (Strict ON).</div>
+          </div>
+          <input id="modalSchBreakCount" type="number" min="1" max="20" value="2" style="width:75px">
+        </div>
+        <div id="modalSchBreakErr" class="ytf-inline-error" style="display:none" role="alert"></div>
+      </div>
     </div>
 
     <div id="modalSchError" class="ytf-error-banner" style="display:none" role="alert"></div>

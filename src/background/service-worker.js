@@ -61,15 +61,37 @@ function isBlockingActive(s, now) {
   return false;
 }
 
+function activeSchedule(s, now) {
+  var sch = (s && s.study && s.study.schedule) || [];
+  var matched = null;
+  for (var i = 0; i < sch.length; i++) {
+    if (scheduleMatches(sch[i], now)) {
+      if (sch[i].mode === 'full') return sch[i];
+      matched = sch[i];
+    }
+  }
+  return matched;
+}
+
+function isScheduleBreakActive(s, now) {
+  now = now || Date.now();
+  var b = s && s.activeBreak;
+  if (!b || !b.endsAt || now >= b.endsAt) return false;
+  var sch = activeSchedule(s, now);
+  if (!sch || sch.id !== b.scheduleId) return false;
+  return true;
+}
+
 function scheduledMode(s, now) {
   var sch = (s && s.study && s.study.schedule) || [];
   var want = null;
   for (var i = 0; i < sch.length; i++) {
     if (scheduleMatches(sch[i], now)) {
-      if (sch[i].mode === 'full') return 'full';
+      if (sch[i].mode === 'full') { want = 'full'; break; }
       want = sch[i].mode || 'study';
     }
   }
+  if (want && isScheduleBreakActive(s, now)) return 'normal';
   return want;
 }
 
@@ -191,11 +213,13 @@ function effectiveMode(s, now) {
       }
       if (st.schedule && st.schedule.length) {
         var cleanSch = st.schedule.filter(function (sch) { return !sch.pendingRemoval; });
-        if (cleanSch.length !== st.schedule.length) {
-          st.schedule = cleanSch;
-          patch.study = st;
-          changed = true;
-        }
+        cleanSch.forEach(function (sch) {
+          sch.breaksUsedCount = 0;
+          sch.breakMinutesUsed = 0;
+        });
+        st.schedule = cleanSch;
+        patch.study = st;
+        changed = true;
       }
     } catch (e) {}
     return { patch: patch, changed: changed };
@@ -259,6 +283,13 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
     chrome.storage.local.set({ snoozeUntil: 0 }).catch(function () {});
     refreshBadge().catch(function () {});
   }
+  if (alarm.name === 'ytf-break-end') {
+    getSettings().then(function (s) {
+      if (s.activeBreak && Date.now() >= s.activeBreak.endsAt) {
+        return chrome.storage.local.set({ activeBreak: null });
+      }
+    }).then(refreshBadge).catch(function () {});
+  }
   if (alarm.name === 'ytf-unblock-end') {
     getSettings().then(function (s) {
       if (s.unblockUntil && Date.now() >= s.unblockUntil) {
@@ -277,6 +308,9 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
     getSettings().then(function (s) {
       var now = Date.now();
       var patch = {};
+      if (s.activeBreak && now >= s.activeBreak.endsAt) {
+        patch.activeBreak = null;
+      }
       if (s.snoozeUntil && now >= s.snoozeUntil) {
         patch.snoozeUntil = 0;
         if (s.session) { s.session.activeUntil = 0; patch.session = s.session; }
@@ -336,8 +370,15 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
 });
 
 chrome.storage.onChanged.addListener(function (changes) {
-  if (changes.snoozeUntil || changes.mode || changes.study || changes.strictMode || changes.blocking || changes.unblockUntil || changes.strictUnlockUntil) {
+  if (changes.snoozeUntil || changes.mode || changes.study || changes.strictMode || changes.blocking || changes.unblockUntil || changes.strictUnlockUntil || changes.activeBreak) {
     refreshBadge().catch(function () {});
+    if (changes.activeBreak) {
+      if (changes.activeBreak.newValue && changes.activeBreak.newValue.endsAt) {
+        chrome.alarms.create('ytf-break-end', { when: changes.activeBreak.newValue.endsAt });
+      } else {
+        chrome.alarms.clear('ytf-break-end').catch(function () {});
+      }
+    }
     if (changes.snoozeUntil && changes.snoozeUntil.newValue) {
       chrome.alarms.create('ytf-snooze-end', { when: changes.snoozeUntil.newValue });
     }
@@ -358,7 +399,10 @@ function refreshBadge() {
     var text = '';
     var color = '#0071E3';
     var active = isBlockingActive(s, now);
-    if (!active) {
+    if (s.activeBreak && now < s.activeBreak.endsAt) {
+      text = 'BRK';
+      color = '#FF9500';
+    } else if (!active) {
       text = 'OFF';
       color = '#8E8E93';
     } else if (s.snoozeUntil && now < s.snoozeUntil) {

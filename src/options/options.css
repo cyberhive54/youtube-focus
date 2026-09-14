@@ -267,6 +267,14 @@ input[type=range] {
   padding: 3px 8px;
   border-radius: 6px;
 }
+.sch-badge-break {
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 149, 0, 0.15);
+  color: #e06c00;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
 .sch-badge-running {
   font-size: 11px;
   font-weight: 700;

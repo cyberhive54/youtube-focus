@@ -134,15 +134,25 @@
     } catch (e) { return false; }
   }
 
+  function isScheduleBreakActive(settings, now) {
+    now = now || Date.now();
+    var b = settings && settings.activeBreak;
+    if (!b || !b.endsAt || now >= b.endsAt) return false;
+    var sch = activeSchedule(settings, now);
+    if (!sch || sch.id !== b.scheduleId) return false;
+    return true;
+  }
+
   function scheduledMode(settings, now) {
-    var sch = (settings.study && settings.study.schedule) || [];
+    var sch = (settings && settings.schedules) || (settings && settings.study && settings.study.schedule) || [];
     var want = null;
     for (var i = 0; i < sch.length; i++) {
       if (scheduleMatches(sch[i], now)) {
-        if (sch[i].mode === 'full') return 'full'; // full wins
+        if (sch[i].mode === 'full') { want = 'full'; break; }
         want = sch[i].mode || 'study';
       }
     }
+    if (want && isScheduleBreakActive(settings, now)) return 'normal';
     return want;
   }
 
@@ -164,10 +174,13 @@
   }
 
   function effectiveMode(settings, now) {
+    if (isScheduleBreakActive(settings, now)) {
+      if (settings && settings.mode === 'full' && settings.blocking && settings.blocking.enabled) return 'full';
+      return 'normal';
+    }
     // Full is the strictest — explicit Full Block always wins.
     if (settings && settings.mode === 'full') return 'full';
     var sm = scheduledMode(settings, now);
-    if (sm === 'full') return 'full';
     // Explicit study timer always wins if active.
     if (settings && settings.study && settings.study.manualUntil && now < settings.study.manualUntil) return 'study';
     var override = settings && settings.study && settings.study.scheduleOverrideMode;
@@ -218,7 +231,7 @@
   }
 
   function activeSchedule(settings, now) {
-    var sch = (settings && settings.study && settings.study.schedule) || [];
+    var sch = (settings && settings.schedules) || (settings && settings.study && settings.study.schedule) || [];
     var matched = null;
     for (var i = 0; i < sch.length; i++) {
       if (scheduleMatches(sch[i], now)) {
@@ -565,6 +578,7 @@
     isChannelAllowlisted: isChannelAllowlisted,
     isScheduleStrictLocked: isScheduleStrictLocked,
     scheduleStrictMinutesRemaining: scheduleStrictMinutesRemaining,
-    isScheduleDueNotification: isScheduleDueNotification
+    isScheduleDueNotification: isScheduleDueNotification,
+    isScheduleBreakActive: isScheduleBreakActive
   };
 })();

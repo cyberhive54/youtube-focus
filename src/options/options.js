@@ -192,6 +192,9 @@
     return false;
   }
 
+  var modalAllowedChannels = [];
+  var modalAllowedVideos = [];
+
   function clearModalSchErrors() {
     var errEl = $('modalSchError');
     if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
@@ -199,6 +202,169 @@
     if (sErr) { sErr.textContent = ''; sErr.style.display = 'none'; }
     var nErr = $('modalSchNotifyErr');
     if (nErr) { nErr.textContent = ''; nErr.style.display = 'none'; }
+    var bErr = $('modalSchBreakErr');
+    if (bErr) { bErr.textContent = ''; bErr.style.display = 'none'; }
+    var cErr = $('modalSchChanErr');
+    if (cErr) { cErr.textContent = ''; cErr.style.display = 'none'; }
+    var vErr = $('modalSchVidErr');
+    if (vErr) { vErr.textContent = ''; vErr.style.display = 'none'; }
+  }
+
+  function renderModalStudyAllowlist() {
+    var chUl = $('modalSchChanList');
+    var chCount = $('modalSchChanCount');
+    if (chCount) chCount.textContent = modalAllowedChannels.length;
+    if (chUl) {
+      chUl.innerHTML = '';
+      if (!modalAllowedChannels.length) {
+        chUl.innerHTML = '<li class="empty" style="font-size:12px;padding:6px 10px">No channels added yet.</li>';
+      } else {
+        modalAllowedChannels.forEach(function (ca, idx) {
+          var li = document.createElement('li');
+          li.className = 'sch-item';
+          var cLabel = ca.handle || ca.url || ca.id || 'Channel';
+          li.innerHTML = '<code>' + cLabel + (ca.id && ca.id !== cLabel ? ' (' + ca.id + ')' : '') + '</code>';
+          var delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.textContent = 'Remove';
+          delBtn.addEventListener('click', function () {
+            modalAllowedChannels.splice(idx, 1);
+            renderModalStudyAllowlist();
+          });
+          li.appendChild(delBtn);
+          chUl.appendChild(li);
+        });
+      }
+    }
+
+    var vidUl = $('modalSchVidList');
+    var vidCount = $('modalSchVidCount');
+    if (vidCount) vidCount.textContent = modalAllowedVideos.length;
+    if (vidUl) {
+      vidUl.innerHTML = '';
+      if (!modalAllowedVideos.length) {
+        vidUl.innerHTML = '<li class="empty" style="font-size:12px;padding:6px 10px">No videos added yet.</li>';
+      } else {
+        modalAllowedVideos.forEach(function (va, idx) {
+          var li = document.createElement('li');
+          li.className = 'sch-item';
+          var vLabel = va.url || va.id || 'Video';
+          li.innerHTML = '<code>' + vLabel + '</code>';
+          var delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.textContent = 'Remove';
+          delBtn.addEventListener('click', function () {
+            modalAllowedVideos.splice(idx, 1);
+            renderModalStudyAllowlist();
+          });
+          li.appendChild(delBtn);
+          vidUl.appendChild(li);
+        });
+      }
+    }
+  }
+
+  function calcScheduleDuration(fromStr, toStr) {
+    function t2m(s) {
+      if (!s || typeof s !== 'string') return 0;
+      var p = s.split(':');
+      return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
+    }
+    var f = t2m(fromStr);
+    var t = t2m(toStr);
+    if (f === t) return 0;
+    if (t > f) return t - f;
+    return (1440 - f) + t;
+  }
+
+  function validateModalBreaks() {
+    var errEl = $('modalSchBreakErr');
+    var isBreaks = $('modalSchBreaks') ? $('modalSchBreaks').checked : false;
+    if (!isBreaks) {
+      if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+      return { valid: true, breakMinutes: 0, breakCount: 0 };
+    }
+
+    var fromVal = ($('modalSchFrom') && $('modalSchFrom').value) || '09:00';
+    var toVal = ($('modalSchTo') && $('modalSchTo').value) || '17:00';
+    var duration = calcScheduleDuration(fromVal, toVal);
+    if (duration <= 0) {
+      var msg = 'Start and end time cannot be the same.';
+      if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+      return { valid: false, error: msg };
+    }
+
+    var isStrict = $('modalSchStrict') ? $('modalSchStrict').checked : false;
+    var pct = isStrict ? 10 : 20;
+    var maxBreakMin = Math.floor(duration * (pct / 100));
+    var maxBreakCount = isStrict ? 10 : 20;
+
+    if (maxBreakMin < 1) {
+      var msg = 'Schedule duration (' + duration + 'm) is too short to allow breaks (' + pct + '% limit is 0 min). Increase schedule duration.';
+      if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+      return { valid: false, error: msg };
+    }
+
+    var rawMin = parseInt($('modalSchBreakMin').value, 10);
+    if (isNaN(rawMin) || rawMin < 1) {
+      var msg = 'Total break time must be at least 1 minute.';
+      if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+      return { valid: false, error: msg };
+    }
+    if (rawMin > maxBreakMin) {
+      var modeLabel = isStrict ? 'Strict Mode ON' : 'Strict Mode OFF';
+      var msg = 'Total break time (' + rawMin + 'm) exceeds max ' + pct + '% allowance (' + maxBreakMin + 'm) for this ' + duration + 'm schedule under ' + modeLabel + '.';
+      if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+      return { valid: false, error: msg };
+    }
+
+    var rawCount = parseInt($('modalSchBreakCount').value, 10);
+    if (isNaN(rawCount) || rawCount < 1) {
+      var msg = 'Number of breaks must be at least 1.';
+      if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+      return { valid: false, error: msg };
+    }
+    if (rawCount > maxBreakCount) {
+      var modeLabel = isStrict ? 'Strict Mode ON' : 'Strict Mode OFF';
+      var msg = 'Number of breaks (' + rawCount + ') exceeds max limit of ' + maxBreakCount + ' under ' + modeLabel + '.';
+      if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+      return { valid: false, error: msg };
+    }
+
+    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+    return {
+      valid: true,
+      breakMinutes: rawMin,
+      breakCount: rawCount,
+      maxBreakMin: maxBreakMin,
+      maxBreakCount: maxBreakCount,
+      duration: duration
+    };
+  }
+
+  function updateModalBreakHints() {
+    var fromVal = ($('modalSchFrom') && $('modalSchFrom').value) || '09:00';
+    var toVal = ($('modalSchTo') && $('modalSchTo').value) || '17:00';
+    var duration = calcScheduleDuration(fromVal, toVal);
+    var isStrict = $('modalSchStrict') ? $('modalSchStrict').checked : false;
+    var pct = isStrict ? 10 : 20;
+    var maxBreakMin = Math.max(0, Math.floor(duration * (pct / 100)));
+    var maxBreakCount = isStrict ? 10 : 20;
+
+    var minHint = $('modalSchBreakMinHint');
+    if (minHint) {
+      minHint.textContent = 'Up to ' + pct + '% of schedule duration (' + maxBreakMin + ' min max for ' + duration + 'm schedule with ' + (isStrict ? 'Strict Mode ON' : 'Strict Mode OFF') + ').';
+    }
+    var countHint = $('modalSchBreakCountHint');
+    if (countHint) {
+      countHint.textContent = '1 to ' + maxBreakCount + ' breaks allowed with ' + (isStrict ? 'Strict Mode ON' : 'Strict Mode OFF') + '.';
+    }
+    if ($('modalSchBreakMin')) $('modalSchBreakMin').max = maxBreakMin;
+    if ($('modalSchBreakCount')) $('modalSchBreakCount').max = maxBreakCount;
+
+    if ($('modalSchBreaks') && $('modalSchBreaks').checked) {
+      validateModalBreaks();
+    }
   }
 
   function syncAppleSelect(modeValue) {
@@ -216,6 +382,10 @@
         if (textSpan) label.textContent = textSpan.textContent;
       }
     });
+    var allowSec = $('modalSchStudyAllowlistSec');
+    if (allowSec) {
+      allowSec.style.display = (modeValue === 'study') ? 'block' : 'none';
+    }
   }
 
   function openScheduleModal(itemToEdit) {
@@ -251,6 +421,19 @@
       if ($('modalSchNotify')) $('modalSchNotify').checked = isNotify;
       if ($('modalBoxNotifyMin')) $('modalBoxNotifyMin').style.display = isNotify ? 'flex' : 'none';
       if ($('modalSchNotifyMin')) $('modalSchNotifyMin').value = itemToEdit.notifyMinutes || 15;
+
+      var isBreaks = !!itemToEdit.breaksEnabled;
+      if ($('modalSchBreaks')) $('modalSchBreaks').checked = isBreaks;
+      if ($('modalBoxBreaks')) $('modalBoxBreaks').style.display = isBreaks ? 'flex' : 'none';
+      if ($('modalSchBreakMin')) $('modalSchBreakMin').value = itemToEdit.breakMinutes || 15;
+      if ($('modalSchBreakCount')) $('modalSchBreakCount').value = itemToEdit.breakCount || 2;
+
+      modalAllowedChannels = (itemToEdit.allowedChannels || []).map(function (c) {
+        return { id: c.id, handle: c.handle, url: c.url };
+      });
+      modalAllowedVideos = (itemToEdit.allowedVideos || []).map(function (v) {
+        return { id: v.id, url: v.url };
+      });
     } else {
       editingScheduleId = null;
       if ($('modalSchTitle')) $('modalSchTitle').textContent = 'Add schedule';
@@ -276,7 +459,18 @@
       if ($('modalSchNotify')) $('modalSchNotify').checked = false;
       if ($('modalBoxNotifyMin')) $('modalBoxNotifyMin').style.display = 'none';
       if ($('modalSchNotifyMin')) $('modalSchNotifyMin').value = 15;
+
+      if ($('modalSchBreaks')) $('modalSchBreaks').checked = false;
+      if ($('modalBoxBreaks')) $('modalBoxBreaks').style.display = 'none';
+      if ($('modalSchBreakMin')) $('modalSchBreakMin').value = 15;
+      if ($('modalSchBreakCount')) $('modalSchBreakCount').value = 2;
+
+      modalAllowedChannels = [];
+      modalAllowedVideos = [];
     }
+
+    renderModalStudyAllowlist();
+    updateModalBreakHints();
 
     var customSelect = $('customSchModeSelect');
     if (customSelect) {
@@ -843,6 +1037,12 @@
 
           if (e.notify) {
             badgesRow.innerHTML += '<span class="sch-badge-notify">🔔 Notify (' + (e.notifyMinutes || 15) + 'm)</span>';
+          }
+
+          if (e.breaksEnabled && e.breakMinutes) {
+            var leftMin = Math.max(0, e.breakMinutes - (e.breakMinutesUsed || 0));
+            var leftCount = Math.max(0, e.breakCount - (e.breaksUsedCount || 0));
+            badgesRow.innerHTML += '<span class="sch-badge-break">☕ Breaks (' + leftMin + 'm / ' + leftCount + ' left)</span>';
           }
 
           if (e.enabled === false) {
@@ -1797,6 +1997,7 @@
         clearModalSchErrors();
         var box = $('modalBoxStrictMin');
         if (box) box.style.display = e.target.checked ? 'flex' : 'none';
+        updateModalBreakHints();
       });
     }
 
@@ -1805,6 +2006,85 @@
         clearModalSchErrors();
         var box = $('modalBoxNotifyMin');
         if (box) box.style.display = e.target.checked ? 'flex' : 'none';
+      });
+    }
+
+    if ($('modalSchBreaks')) {
+      $('modalSchBreaks').addEventListener('change', function (e) {
+        clearModalSchErrors();
+        var box = $('modalBoxBreaks');
+        if (box) box.style.display = e.target.checked ? 'flex' : 'none';
+        updateModalBreakHints();
+      });
+    }
+
+    if ($('modalSchFrom')) $('modalSchFrom').addEventListener('change', updateModalBreakHints);
+    if ($('modalSchTo')) $('modalSchTo').addEventListener('change', updateModalBreakHints);
+    if ($('modalSchBreakMin')) $('modalSchBreakMin').addEventListener('input', validateModalBreaks);
+    if ($('modalSchBreakCount')) $('modalSchBreakCount').addEventListener('input', validateModalBreaks);
+
+    if ($('btnModalSchAddChan')) {
+      $('btnModalSchAddChan').addEventListener('click', function () {
+        var input = $('modalSchChanInput');
+        var errEl = $('modalSchChanErr');
+        if (!input) return;
+        var raw = input.value.trim();
+        if (!raw) return;
+        var parsed = parseChannel(raw);
+        if (!parsed) {
+          if (errEl) {
+            errEl.textContent = 'Invalid YouTube channel. Enter @handle, channel URL, or UC... ID.';
+            errEl.style.display = 'block';
+          }
+          return;
+        }
+        if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+        modalAllowedChannels.push(parsed);
+        input.value = '';
+        renderModalStudyAllowlist();
+      });
+    }
+    if ($('modalSchChanInput')) {
+      $('modalSchChanInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if ($('btnModalSchAddChan')) $('btnModalSchAddChan').click();
+        } else {
+          if ($('modalSchChanErr')) $('modalSchChanErr').style.display = 'none';
+        }
+      });
+    }
+
+    if ($('btnModalSchAddVid')) {
+      $('btnModalSchAddVid').addEventListener('click', function () {
+        var input = $('modalSchVidInput');
+        var errEl = $('modalSchVidErr');
+        if (!input) return;
+        var raw = input.value.trim();
+        if (!raw) return;
+        var m = raw.match(/[?&]v=([\w-]{6,})|\/shorts\/([\w-]{6,})|^([\w-]{11})$/);
+        var vidId = m ? (m[1] || m[2] || m[3]) : null;
+        if (!vidId) {
+          if (errEl) {
+            errEl.textContent = 'Invalid YouTube video. Enter a watch URL, Shorts URL, or 11-character video ID.';
+            errEl.style.display = 'block';
+          }
+          return;
+        }
+        if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+        modalAllowedVideos.push({ id: vidId, url: raw });
+        input.value = '';
+        renderModalStudyAllowlist();
+      });
+    }
+    if ($('modalSchVidInput')) {
+      $('modalSchVidInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if ($('btnModalSchAddVid')) $('btnModalSchAddVid').click();
+        } else {
+          if ($('modalSchVidErr')) $('modalSchVidErr').style.display = 'none';
+        }
       });
     }
 
@@ -1871,6 +2151,13 @@
           notifyMin = rawN;
         }
 
+        var isBreaks = $('modalSchBreaks') ? !!$('modalSchBreaks').checked : false;
+        var breakRes = { valid: true, breakMinutes: 0, breakCount: 0 };
+        if (isBreaks) {
+          breakRes = validateModalBreaks();
+          if (!breakRes.valid) return;
+        }
+
         var nameVal = ($('modalSchName') && $('modalSchName').value ? $('modalSchName').value.trim() : '');
 
         var proposed = {
@@ -1885,8 +2172,13 @@
           strictLockMinutes: strictMin,
           notify: isNotify,
           notifyMinutes: notifyMin,
-          allowedChannels: [],
-          allowedVideos: []
+          breaksEnabled: isBreaks,
+          breakMinutes: isBreaks ? (breakRes.breakMinutes || 15) : 0,
+          breakCount: isBreaks ? (breakRes.breakCount || 2) : 0,
+          breaksUsedCount: 0,
+          breakMinutesUsed: 0,
+          allowedChannels: (m === 'study') ? modalAllowedChannels.slice() : [],
+          allowedVideos: (m === 'study') ? modalAllowedVideos.slice() : []
         };
 
         var existingList = (settings.study && settings.study.schedule) || [];
@@ -1928,6 +2220,13 @@
                 target.strictLockMinutes = toSave.strictLockMinutes;
                 target.notify = toSave.notify;
                 target.notifyMinutes = toSave.notifyMinutes;
+                target.breaksEnabled = toSave.breaksEnabled;
+                target.breakMinutes = toSave.breakMinutes;
+                target.breakCount = toSave.breakCount;
+                if (toSave.mode === 'study') {
+                  target.allowedChannels = toSave.allowedChannels;
+                  target.allowedVideos = toSave.allowedVideos;
+                }
                 found = true;
                 break;
               }
