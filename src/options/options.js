@@ -4,6 +4,7 @@
   var store = window.YTFOCUS.store;
   var settings = null;
   var expandedSchedules = {};
+  var editingScheduleId = null;
   var currentTab = 'focus';
 
   function $(id) { return document.getElementById(id); }
@@ -40,7 +41,7 @@
   function setDisabledAll() {
     var L = locked();
     document.querySelectorAll('input, button, select').forEach(function (el) {
-      if (el.id === 'sStrict' || el.id === 'btnCancelStrict' || el.id === 'btnCancelUnblock' || el.id === 'resetBtn' || el.closest('#resetDialog')) return;
+      if (el.id === 'sStrict' || el.id === 'btnCancelStrict' || el.id === 'btnCancelUnblock' || el.id === 'resetBtn' || el.closest('#resetDialog') || el.id === 'btnModalSchClose' || el.id === 'btnModalSchCancel') return;
       if (el.classList.contains('ytf-tab') || el.classList.contains('sch-expand-btn')) return;
       // Strict locks everything except Strict toggle itself (and reset with confirm).
       el.disabled = L;
@@ -165,6 +166,116 @@
       }
       return false;
     } catch (e) { return false; }
+  }
+
+  function timeMatches(fromMin, toMin, m) {
+    if (fromMin === toMin) return false;
+    if (fromMin < toMin) return m >= fromMin && m < toMin;
+    return m >= fromMin || m < toMin;
+  }
+
+  function schedulesOverlap(a, b) {
+    var aDays = a.days || [];
+    var bDays = b.days || [];
+    var hasShared = aDays.some(function (d) { return bDays.indexOf(d) !== -1; });
+    if (!hasShared) return false;
+    var aFrom = timeToMin(a.from);
+    var aTo = timeToMin(a.to);
+    var bFrom = timeToMin(b.from);
+    var bTo = timeToMin(b.to);
+    if (aFrom === aTo || bFrom === bTo) return false;
+    for (var m = 0; m < 1440; m++) {
+      if (timeMatches(aFrom, aTo, m) && timeMatches(bFrom, bTo, m)) return true;
+    }
+    return false;
+  }
+
+  function clearModalSchErrors() {
+    var errEl = $('modalSchError');
+    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+    var sErr = $('modalSchStrictErr');
+    if (sErr) { sErr.textContent = ''; sErr.style.display = 'none'; }
+    var nErr = $('modalSchNotifyErr');
+    if (nErr) { nErr.textContent = ''; nErr.style.display = 'none'; }
+  }
+
+  function openScheduleModal(itemToEdit) {
+    clearModalSchErrors();
+    var dlg = $('scheduleModal');
+    if (!dlg) return;
+
+    if (itemToEdit) {
+      editingScheduleId = itemToEdit.id;
+      if ($('modalSchTitle')) $('modalSchTitle').textContent = 'Edit schedule';
+      if ($('btnModalSchSave')) $('btnModalSchSave').textContent = 'Save changes';
+      if ($('modalSchName')) $('modalSchName').value = itemToEdit.name || '';
+      if ($('modalSchMode')) $('modalSchMode').value = itemToEdit.mode || 'study';
+      if ($('modalSchFrom')) $('modalSchFrom').value = itemToEdit.from || '09:00';
+      if ($('modalSchTo')) $('modalSchTo').value = itemToEdit.to || '17:00';
+
+      var editDays = itemToEdit.days || [1, 2, 3, 4, 5];
+      document.querySelectorAll('#modalSchDayGroup [data-modalschday]').forEach(function (b) {
+        var d = parseInt(b.getAttribute('data-modalschday'), 10);
+        if (editDays.indexOf(d) !== -1) {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
+
+      var isStrict = !!itemToEdit.strict;
+      if ($('modalSchStrict')) $('modalSchStrict').checked = isStrict;
+      if ($('modalBoxStrictMin')) $('modalBoxStrictMin').style.display = isStrict ? 'flex' : 'none';
+      if ($('modalSchStrictMin')) $('modalSchStrictMin').value = itemToEdit.strictLockMinutes || 60;
+
+      var isNotify = !!itemToEdit.notify;
+      if ($('modalSchNotify')) $('modalSchNotify').checked = isNotify;
+      if ($('modalBoxNotifyMin')) $('modalBoxNotifyMin').style.display = isNotify ? 'flex' : 'none';
+      if ($('modalSchNotifyMin')) $('modalSchNotifyMin').value = itemToEdit.notifyMinutes || 15;
+    } else {
+      editingScheduleId = null;
+      if ($('modalSchTitle')) $('modalSchTitle').textContent = 'Add schedule';
+      if ($('btnModalSchSave')) $('btnModalSchSave').textContent = 'Add schedule';
+      if ($('modalSchName')) $('modalSchName').value = '';
+      if ($('modalSchMode')) $('modalSchMode').value = 'study';
+      if ($('modalSchFrom')) $('modalSchFrom').value = '09:00';
+      if ($('modalSchTo')) $('modalSchTo').value = '17:00';
+
+      document.querySelectorAll('#modalSchDayGroup [data-modalschday]').forEach(function (b) {
+        var d = parseInt(b.getAttribute('data-modalschday'), 10);
+        if (d >= 1 && d <= 5) {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
+
+      if ($('modalSchStrict')) $('modalSchStrict').checked = false;
+      if ($('modalBoxStrictMin')) $('modalBoxStrictMin').style.display = 'none';
+      if ($('modalSchStrictMin')) $('modalSchStrictMin').value = 60;
+
+      if ($('modalSchNotify')) $('modalSchNotify').checked = false;
+      if ($('modalBoxNotifyMin')) $('modalBoxNotifyMin').style.display = 'none';
+      if ($('modalSchNotifyMin')) $('modalSchNotifyMin').value = 15;
+    }
+
+    if (typeof dlg.showModal === 'function') {
+      dlg.showModal();
+    } else {
+      dlg.setAttribute('open', '');
+    }
+  }
+
+  function closeScheduleModal() {
+    var dlg = $('scheduleModal');
+    if (!dlg) return;
+    editingScheduleId = null;
+    clearModalSchErrors();
+    if (typeof dlg.close === 'function') {
+      dlg.close();
+    } else {
+      dlg.removeAttribute('open');
+    }
   }
 
   function render() {
@@ -633,7 +744,7 @@
       if (countBadge) countBadge.textContent = list.length;
 
       if (!list.length) {
-        sl.innerHTML = '<div class="empty" style="padding:24px;text-align:center;color:var(--ytf-text-2);background:var(--ytf-fill-2);border-radius:14px;font-size:13px">No automatic schedules configured yet. Use the form above to add your first focus schedule.</div>';
+        sl.innerHTML = '<div class="empty" style="padding:24px;text-align:center;color:var(--ytf-text-2);background:var(--ytf-fill-2);border-radius:14px;font-size:13px">No automatic schedules configured yet. Click <strong>+ Add schedule</strong> above to create your first focus schedule.</div>';
         return;
       }
 
@@ -680,37 +791,53 @@
           titleEl.textContent = titleText;
           info.appendChild(titleEl);
 
-          var summary = document.createElement('div');
-          summary.className = 'sch-card-summary';
-          summary.innerHTML =
-            '<span class="sch-badge-mode">' + modeTitle + '</span>' +
-            '<span>' + daysText + ' • ' + timeText + '</span>';
+          var timeEl = document.createElement('div');
+          timeEl.className = 'sch-card-time';
+          timeEl.textContent = daysText + ' • ' + timeText;
+          info.appendChild(timeEl);
+
+          var badgesRow = document.createElement('div');
+          badgesRow.className = 'sch-badges-row';
+          badgesRow.innerHTML = '<span class="sch-badge-mode">' + modeTitle + '</span>';
 
           if (isRunning) {
-            summary.innerHTML += '<span class="sch-badge-running">Active now (locked)</span>';
+            badgesRow.innerHTML += '<span class="sch-badge-running">Active now (locked)</span>';
           } else if (isStrictLocked) {
             var rText = (minsRemaining !== null && minsRemaining > 0) ? ('starts in ' + minsRemaining + 'm') : 'locked';
-            summary.innerHTML += '<span class="sch-badge-strict">⏳ Strict Locked (' + rText + ')</span>';
+            badgesRow.innerHTML += '<span class="sch-badge-strict">⏳ Strict Locked (' + rText + ')</span>';
           } else if (e.strict) {
-            summary.innerHTML += '<span class="sch-badge-strict">Strict (' + (e.strictLockMinutes || 60) + 'm)</span>';
+            badgesRow.innerHTML += '<span class="sch-badge-strict">Strict (' + (e.strictLockMinutes || 60) + 'm)</span>';
           }
 
           if (e.notify) {
-            summary.innerHTML += '<span class="sch-badge-notify">🔔 Notify (' + (e.notifyMinutes || 15) + 'm)</span>';
+            badgesRow.innerHTML += '<span class="sch-badge-notify">🔔 Notify (' + (e.notifyMinutes || 15) + 'm)</span>';
           }
 
           if (e.enabled === false) {
-            summary.innerHTML += '<span class="sch-badge-disabled">Inactive</span>';
+            badgesRow.innerHTML += '<span class="sch-badge-disabled">Inactive</span>';
           } else {
-            summary.innerHTML += '<span class="sch-badge-enabled">Active</span>';
+            badgesRow.innerHTML += '<span class="sch-badge-enabled">Active</span>';
           }
 
-          info.appendChild(summary);
+          info.appendChild(badgesRow);
           header.appendChild(info);
 
           // Actions
           var actions = document.createElement('div');
           actions.className = 'sch-actions';
+
+          // Edit button
+          var editBtn = document.createElement('button');
+          editBtn.type = 'button';
+          editBtn.className = 'sch-edit-btn';
+          editBtn.textContent = 'Edit';
+          editBtn.disabled = isLocked;
+          editBtn.title = isLocked ? 'Cannot edit schedule while running or strict-locked' : 'Edit schedule';
+          editBtn.addEventListener('click', function () {
+            if (isLocked) return;
+            openScheduleModal(e);
+          });
+          actions.appendChild(editBtn);
 
           // Active / Inactive switch
           var switchLabel = document.createElement('label');
@@ -737,13 +864,6 @@
           delBtn.type = 'button';
           delBtn.className = 'sch-delete-btn';
           delBtn.textContent = 'Delete';
-          delBtn.style.color = 'var(--ytf-danger)';
-          delBtn.style.background = 'none';
-          delBtn.style.border = 'none';
-          delBtn.style.cursor = isLocked ? 'not-allowed' : 'pointer';
-          delBtn.style.fontWeight = '600';
-          delBtn.style.fontSize = '12px';
-          delBtn.style.opacity = isLocked ? '0.4' : '1';
           delBtn.disabled = isLocked;
           delBtn.title = isLocked ? 'Cannot delete schedule while running or strict-locked' : 'Delete schedule';
           delBtn.addEventListener('click', function () {
@@ -1568,169 +1688,192 @@
       $('vidInput').value = '';
       stagePending('add', 'video', { id: id, url: v });
     });
-    function timeMatches(fromMin, toMin, m) {
-      if (fromMin === toMin) return false;
-      if (fromMin < toMin) return m >= fromMin && m < toMin;
-      return m >= fromMin || m < toMin;
-    }
-    function schedulesOverlap(a, b) {
-      var aDays = a.days || [];
-      var bDays = b.days || [];
-      var hasShared = aDays.some(function (d) { return bDays.indexOf(d) !== -1; });
-      if (!hasShared) return false;
-      var aFrom = timeToMin(a.from);
-      var aTo = timeToMin(a.to);
-      var bFrom = timeToMin(b.from);
-      var bTo = timeToMin(b.to);
-      if (aFrom === aTo || bFrom === bTo) return false;
-      for (var m = 0; m < 1440; m++) {
-        if (timeMatches(aFrom, aTo, m) && timeMatches(bFrom, bTo, m)) return true;
-      }
-      return false;
-    }
-    function clearSchErrors() {
-      var errEl = $('schError');
-      if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
-      var sErr = $('schStrictErr');
-      if (sErr) { sErr.textContent = ''; sErr.style.display = 'none'; }
-      var nErr = $('schNotifyErr');
-      if (nErr) { nErr.textContent = ''; nErr.style.display = 'none'; }
+    // Schedule Modal wiring
+    if ($('btnOpenAddSchedule')) {
+      $('btnOpenAddSchedule').addEventListener('click', function () {
+        if (locked()) return;
+        openScheduleModal(null);
+      });
     }
 
-    // Schedule day picker (Mon–Fri preselected); toggle to choose days.
-    var schDayGroup = $('schDayGroup');
-    if (schDayGroup) schDayGroup.addEventListener('click', function (ev) {
-      var b = ev.target && ev.target.closest ? ev.target.closest('[data-schday]') : null;
-      if (!b || b.disabled) return;
-      clearSchErrors();
-      b.classList.toggle('active');
-    });
-    if ($('schFrom')) $('schFrom').addEventListener('input', clearSchErrors);
-    if ($('schTo')) $('schTo').addEventListener('input', clearSchErrors);
-    if ($('schMode')) $('schMode').addEventListener('change', clearSchErrors);
-    if ($('schName')) $('schName').addEventListener('input', clearSchErrors);
+    if ($('btnModalSchClose')) {
+      $('btnModalSchClose').addEventListener('click', function (e) {
+        e.preventDefault();
+        closeScheduleModal();
+      });
+    }
 
-    if ($('schStrict')) {
-      $('schStrict').addEventListener('change', function (e) {
-        clearSchErrors();
-        var box = $('boxSchStrictMin');
+    if ($('btnModalSchCancel')) {
+      $('btnModalSchCancel').addEventListener('click', function () {
+        closeScheduleModal();
+      });
+    }
+
+    var modalSchDayGroup = $('modalSchDayGroup');
+    if (modalSchDayGroup) {
+      modalSchDayGroup.addEventListener('click', function (ev) {
+        var b = ev.target && ev.target.closest ? ev.target.closest('[data-modalschday]') : null;
+        if (!b || b.disabled) return;
+        clearModalSchErrors();
+        b.classList.toggle('active');
+      });
+    }
+
+    if ($('modalSchFrom')) $('modalSchFrom').addEventListener('input', clearModalSchErrors);
+    if ($('modalSchTo')) $('modalSchTo').addEventListener('input', clearModalSchErrors);
+    if ($('modalSchMode')) $('modalSchMode').addEventListener('change', clearModalSchErrors);
+    if ($('modalSchName')) $('modalSchName').addEventListener('input', clearModalSchErrors);
+
+    if ($('modalSchStrict')) {
+      $('modalSchStrict').addEventListener('change', function (e) {
+        clearModalSchErrors();
+        var box = $('modalBoxStrictMin');
         if (box) box.style.display = e.target.checked ? 'flex' : 'none';
       });
     }
 
-    if ($('schNotify')) {
-      $('schNotify').addEventListener('change', function (e) {
-        clearSchErrors();
-        var box = $('boxSchNotifyMin');
+    if ($('modalSchNotify')) {
+      $('modalSchNotify').addEventListener('change', function (e) {
+        clearModalSchErrors();
+        var box = $('modalBoxNotifyMin');
         if (box) box.style.display = e.target.checked ? 'flex' : 'none';
       });
     }
 
-    if ($('schStrictMin')) $('schStrictMin').addEventListener('input', clearSchErrors);
-    if ($('schNotifyMin')) $('schNotifyMin').addEventListener('input', clearSchErrors);
+    if ($('modalSchStrictMin')) $('modalSchStrictMin').addEventListener('input', clearModalSchErrors);
+    if ($('modalSchNotifyMin')) $('modalSchNotifyMin').addEventListener('input', clearModalSchErrors);
 
-    $('schAdd').addEventListener('click', function () {
-      clearSchErrors();
-      var days = [];
-      document.querySelectorAll('#schDayGroup [data-schday].active').forEach(function (b) {
-        var d = parseInt(b.getAttribute('data-schday'), 10);
-        if (!isNaN(d)) days.push(d);
-      });
-      if (!days.length) days = [1, 2, 3, 4, 5];
-      var fromVal = $('schFrom').value || '09:00';
-      var toVal = $('schTo').value || '17:00';
-      if (fromVal === toVal) {
-        var errEl = $('schError');
-        if (errEl) {
-          errEl.textContent = 'Cannot add schedule: start and end time cannot be the same.';
-          errEl.style.display = 'block';
-        }
-        return;
-      }
-      var m = $('schMode').value || 'study';
-      if (['study', 'restricted', 'full'].indexOf(m) === -1) m = 'study';
-
-      var isStrict = $('schStrict') ? !!$('schStrict').checked : false;
-      var strictMin = 60;
-      if (isStrict) {
-        var rawS = parseInt($('schStrictMin').value, 10);
-        if (isNaN(rawS) || rawS < 10 || rawS > 360) {
-          var sErr = $('schStrictErr');
-          if (sErr) {
-            sErr.textContent = 'Lock time must be between 10 and 360 minutes.';
-            sErr.style.display = 'block';
-          }
-          return;
-        }
-        strictMin = rawS;
-      }
-
-      var isNotify = $('schNotify') ? !!$('schNotify').checked : false;
-      var notifyMin = 15;
-      if (isNotify) {
-        var rawN = parseInt($('schNotifyMin').value, 10);
-        if (isNaN(rawN) || rawN < 1) {
-          var nErr = $('schNotifyErr');
-          if (nErr) {
-            nErr.textContent = 'Notification time must be at least 1 minute.';
-            nErr.style.display = 'block';
-          }
-          return;
-        }
-        if (isStrict && rawN >= strictMin) {
-          var nErr = $('schNotifyErr');
-          if (nErr) {
-            nErr.textContent = 'Pre-schedule notification (' + rawN + 'm) must be less than strict lock time (' + strictMin + 'm).';
-            nErr.style.display = 'block';
-          }
-          return;
-        }
-        notifyMin = rawN;
-      }
-
-      var nameVal = ($('schName') && $('schName').value ? $('schName').value.trim() : '');
-
-      var proposed = {
-        id: 'sch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-        name: nameVal,
-        days: days.slice().sort(),
-        from: fromVal,
-        to: toVal,
-        mode: m,
-        enabled: true,
-        strict: isStrict,
-        strictLockMinutes: strictMin,
-        notify: isNotify,
-        notifyMinutes: notifyMin,
-        allowedChannels: [],
-        allowedVideos: []
-      };
-
-      var existingList = (settings.study && settings.study.schedule) || [];
-      for (var i = 0; i < existingList.length; i++) {
-        var ex = existingList[i];
-        // Only active/enabled schedules block new schedules from overlapping
-        if (ex.enabled !== false && schedulesOverlap(proposed, ex)) {
-          var dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-          var exDays = (ex.days || []).map(function (d) { return dayNames[d]; }).join(',');
-          var modeLabels = (window.YTFOCUS.CONSTANTS || {}).MODE_LABELS || {};
-          var exMode = modeLabels[ex.mode] || ex.mode;
-          var exLabel = ex.name ? ('"' + ex.name + '"') : (exMode + ' schedule');
-          var errEl = $('schError');
+    if ($('btnModalSchSave')) {
+      $('btnModalSchSave').addEventListener('click', function () {
+        clearModalSchErrors();
+        var days = [];
+        document.querySelectorAll('#modalSchDayGroup [data-modalschday].active').forEach(function (b) {
+          var d = parseInt(b.getAttribute('data-modalschday'), 10);
+          if (!isNaN(d)) days.push(d);
+        });
+        if (!days.length) days = [1, 2, 3, 4, 5];
+        var fromVal = $('modalSchFrom').value || '09:00';
+        var toVal = $('modalSchTo').value || '17:00';
+        if (fromVal === toVal) {
+          var errEl = $('modalSchError');
           if (errEl) {
-            errEl.textContent = 'Cannot add schedule: overlaps with existing active ' + exLabel + ' on ' + exDays + ' (' + ex.from + '–' + ex.to + ').';
+            errEl.textContent = 'Cannot save schedule: start and end time cannot be the same.';
             errEl.style.display = 'block';
           }
           return;
         }
-      }
+        var m = $('modalSchMode').value || 'study';
+        if (['study', 'restricted', 'full'].indexOf(m) === -1) m = 'study';
 
-      settings.study = settings.study || {};
-      settings.study.schedule = settings.study.schedule || [];
-      settings.study.schedule.push(proposed);
-      if ($('schName')) $('schName').value = '';
-      save({ study: settings.study });
-    });
+        var isStrict = $('modalSchStrict') ? !!$('modalSchStrict').checked : false;
+        var strictMin = 60;
+        if (isStrict) {
+          var rawS = parseInt($('modalSchStrictMin').value, 10);
+          if (isNaN(rawS) || rawS < 10 || rawS > 360) {
+            var sErr = $('modalSchStrictErr');
+            if (sErr) {
+              sErr.textContent = 'Lock time must be between 10 and 360 minutes.';
+              sErr.style.display = 'block';
+            }
+            return;
+          }
+          strictMin = rawS;
+        }
+
+        var isNotify = $('modalSchNotify') ? !!$('modalSchNotify').checked : false;
+        var notifyMin = 15;
+        if (isNotify) {
+          var rawN = parseInt($('modalSchNotifyMin').value, 10);
+          if (isNaN(rawN) || rawN < 1) {
+            var nErr = $('modalSchNotifyErr');
+            if (nErr) {
+              nErr.textContent = 'Notification time must be at least 1 minute.';
+              nErr.style.display = 'block';
+            }
+            return;
+          }
+          if (isStrict && rawN >= strictMin) {
+            var nErr = $('modalSchNotifyErr');
+            if (nErr) {
+              nErr.textContent = 'Pre-schedule notification (' + rawN + 'm) must be less than strict lock time (' + strictMin + 'm).';
+              nErr.style.display = 'block';
+            }
+            return;
+          }
+          notifyMin = rawN;
+        }
+
+        var nameVal = ($('modalSchName') && $('modalSchName').value ? $('modalSchName').value.trim() : '');
+
+        var proposed = {
+          id: editingScheduleId || ('sch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)),
+          name: nameVal,
+          days: days.slice().sort(),
+          from: fromVal,
+          to: toVal,
+          mode: m,
+          enabled: true,
+          strict: isStrict,
+          strictLockMinutes: strictMin,
+          notify: isNotify,
+          notifyMinutes: notifyMin,
+          allowedChannels: [],
+          allowedVideos: []
+        };
+
+        var existingList = (settings.study && settings.study.schedule) || [];
+        for (var i = 0; i < existingList.length; i++) {
+          var ex = existingList[i];
+          // When editing, do not compare against self
+          if (editingScheduleId && ex.id === editingScheduleId) continue;
+          // Only active/enabled schedules block new schedules from overlapping
+          if (ex.enabled !== false && schedulesOverlap(proposed, ex)) {
+            var dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            var exDays = (ex.days || []).map(function (d) { return dayNames[d]; }).join(',');
+            var modeLabels = (window.YTFOCUS.CONSTANTS || {}).MODE_LABELS || {};
+            var exMode = modeLabels[ex.mode] || ex.mode;
+            var exLabel = ex.name ? ('"' + ex.name + '"') : (exMode + ' schedule');
+            var errEl = $('modalSchError');
+            if (errEl) {
+              errEl.textContent = 'Cannot save schedule: overlaps with existing active ' + exLabel + ' on ' + exDays + ' (' + ex.from + '–' + ex.to + ').';
+              errEl.style.display = 'block';
+            }
+            return;
+          }
+        }
+
+        settings.study = settings.study || {};
+        settings.study.schedule = settings.study.schedule || [];
+
+        if (editingScheduleId) {
+          var found = false;
+          for (var sIdx = 0; sIdx < settings.study.schedule.length; sIdx++) {
+            if (settings.study.schedule[sIdx].id === editingScheduleId) {
+              var target = settings.study.schedule[sIdx];
+              target.name = nameVal;
+              target.days = days.slice().sort();
+              target.from = fromVal;
+              target.to = toVal;
+              target.mode = m;
+              target.strict = isStrict;
+              target.strictLockMinutes = strictMin;
+              target.notify = isNotify;
+              target.notifyMinutes = notifyMin;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            settings.study.schedule.push(proposed);
+          }
+        } else {
+          settings.study.schedule.push(proposed);
+        }
+
+        closeScheduleModal();
+        save({ study: settings.study });
+      });
+    }
 
     var resetDialog = $('resetDialog');
     var resetL1 = $('resetLayer1');

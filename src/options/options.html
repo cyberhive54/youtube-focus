@@ -320,79 +320,14 @@
 
   <div id="paneSchedules" class="ytf-tab-pane" role="tabpanel" aria-labelledby="tabSchedules" style="display:none">
     <section class="ytf-card block">
-      <h2 class="ytf-headline">Add schedule</h2>
-      <p class="ytf-caption">Automate your focus modes. Local time. Each schedule can enforce Study, Restricted, or Full Block mode, and can have its own independent channel and video allowlists.</p>
-
-      <div style="margin-top:12px">
-        <label for="schName" class="ytf-caption" style="display:block;font-weight:600;margin-bottom:4px">Schedule name (optional)</label>
-        <input id="schName" type="text" placeholder="e.g. DSA Practice, Physics Deep Work, Morning Focus" style="width:100%;box-sizing:border-box">
-      </div>
-
-      <div class="addrow wrap" style="margin-top:10px">
-        <select id="schMode">
-          <option value="study" selected>Study Mode</option>
-          <option value="restricted">Restricted Mode</option>
-          <option value="full">Full Block Mode</option>
-        </select>
-        <input id="schFrom" type="time" value="09:00" aria-label="Start time">
-        <input id="schTo" type="time" value="17:00" aria-label="End time">
-        <button class="ytf-btn ytf-btn-primary" id="schAdd">Add schedule</button>
-      </div>
-
-      <div class="ytf-pill-group" id="schDayGroup" style="padding:10px 0 0">
-        <button class="ytf-pill active" data-schday="1">Mon</button>
-        <button class="ytf-pill active" data-schday="2">Tue</button>
-        <button class="ytf-pill active" data-schday="3">Wed</button>
-        <button class="ytf-pill active" data-schday="4">Thu</button>
-        <button class="ytf-pill active" data-schday="5">Fri</button>
-        <button class="ytf-pill" data-schday="6">Sat</button>
-        <button class="ytf-pill" data-schday="0">Sun</button>
-      </div>
-
-      <div class="ytf-divider"></div>
-
-      <!-- Strict Mode Config -->
-      <div class="ytf-row" style="padding-left:0;padding-right:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
         <div>
-          <strong>Strict Mode</strong>
-          <div class="ytf-caption">Locks allowlist, schedule status, and times before start through end of schedule.</div>
+          <h2 class="ytf-headline" style="margin:0">Schedules</h2>
+          <p class="ytf-caption" style="margin:4px 0 0">Automate your focus modes. Local time. Each schedule enforces its own mode and manages its own independent channel and video allowlists.</p>
         </div>
-        <label class="ytf-switch"><input type="checkbox" id="schStrict"><span class="track"></span><span class="thumb"></span></label>
+        <button class="ytf-btn ytf-btn-primary" id="btnOpenAddSchedule" type="button" style="white-space:nowrap;padding:0 18px;min-height:38px">+ Add schedule</button>
       </div>
-      <div id="boxSchStrictMin" style="display:none;align-items:center;justify-content:space-between;gap:12px;margin-top:6px;padding:8px 12px;background:var(--ytf-fill-2);border-radius:10px">
-        <div>
-          <strong style="font-size:13px">Lock settings before start (minutes)</strong>
-          <div class="ytf-caption">10 to 360 minutes before start time.</div>
-        </div>
-        <input id="schStrictMin" type="number" min="10" max="360" value="60" style="width:75px">
-      </div>
-      <div id="schStrictErr" class="ytf-caption" style="display:none;color:#d70015;margin-top:4px;font-weight:500" role="alert"></div>
-
-      <div class="ytf-divider"></div>
-
-      <!-- Notification Config -->
-      <div class="ytf-row" style="padding-left:0;padding-right:0">
-        <div>
-          <strong>Pre-schedule notification</strong>
-          <div class="ytf-caption">Shows a 5-second center notification popup on YouTube before the schedule starts.</div>
-        </div>
-        <label class="ytf-switch"><input type="checkbox" id="schNotify"><span class="track"></span><span class="thumb"></span></label>
-      </div>
-      <div id="boxSchNotifyMin" style="display:none;align-items:center;justify-content:space-between;gap:12px;margin-top:6px;padding:8px 12px;background:var(--ytf-fill-2);border-radius:10px">
-        <div>
-          <strong style="font-size:13px">Notify time before start (minutes)</strong>
-          <div class="ytf-caption">Must be less than Strict lock minutes if Strict Mode is on.</div>
-        </div>
-        <input id="schNotifyMin" type="number" min="1" max="359" value="15" style="width:75px">
-      </div>
-      <div id="schNotifyErr" class="ytf-caption" style="display:none;color:#d70015;margin-top:4px;font-weight:500" role="alert"></div>
-
-      <div id="schError" class="ytf-caption" style="display:none;color:#d70015;margin-top:10px;font-weight:600;padding:8px;background:rgba(215,0,21,0.08);border-radius:8px" role="alert"></div>
-    </section>
-
-    <section class="ytf-card block">
-      <h2 class="ytf-headline">Configured schedules</h2>
-      <p class="ytf-caption">Each schedule enforces its own mode and manages its own independent channel and video allowlist. While a schedule is actively running (or strict-locked), its allowlist and controls cannot be edited. When idle, you can add or remove allowed channels/videos immediately without midnight delays.</p>
+      <div class="ytf-divider" style="margin:16px 0 12px"></div>
       <div class="sch-card-list" id="schList"></div>
     </section>
   </div>
@@ -457,6 +392,93 @@
         <button class="ytf-btn ytf-btn-danger" id="resetBtnFinal" type="button" disabled style="background:#d70015;color:#fff">Permanently erase all data</button>
         <button class="ytf-btn ytf-btn-secondary" id="resetBtnCancel2" type="button">Cancel</button>
       </div>
+    </div>
+  </dialog>
+
+  <dialog class="ytf-dialog schedule-dialog" id="scheduleModal" aria-labelledby="modalSchTitle">
+    <form method="dialog" class="dialog-close"><button type="submit" id="btnModalSchClose" aria-label="Close schedule modal">×</button></form>
+    <h2 id="modalSchTitle" class="ytf-title">Add schedule</h2>
+    <p class="ytf-body" style="font-size:13px;margin-bottom:16px">Automate focus modes with independent allowlists, active toggles, and strict locks.</p>
+
+    <div>
+      <label for="modalSchName" class="ytf-caption" style="display:block;font-weight:600;margin-bottom:6px">Schedule name (optional)</label>
+      <input id="modalSchName" type="text" placeholder="e.g. DSA Practice, Physics Deep Work, Morning Focus" style="width:100%;box-sizing:border-box">
+    </div>
+
+    <div style="margin-top:14px">
+      <label for="modalSchMode" class="ytf-caption" style="display:block;font-weight:600;margin-bottom:6px">Blocking mode</label>
+      <select id="modalSchMode" style="width:100%;min-height:44px;border-radius:12px;background:var(--ytf-bg);color:var(--ytf-text);border:1px solid var(--ytf-separator);padding:0 12px;font:inherit">
+        <option value="study" selected>Study Mode (Approved channels &amp; videos only)</option>
+        <option value="restricted">Restricted Mode (Search &amp; Subscriptions only)</option>
+        <option value="full">Full Block Mode (Only Watch Later &amp; Studio)</option>
+      </select>
+    </div>
+
+    <div class="time-range-row" style="margin-top:14px">
+      <div>
+        <label for="modalSchFrom" class="ytf-caption" style="display:block;font-weight:600;margin-bottom:6px">Start time</label>
+        <input id="modalSchFrom" type="time" value="09:00" style="width:100%;box-sizing:border-box">
+      </div>
+      <div>
+        <label for="modalSchTo" class="ytf-caption" style="display:block;font-weight:600;margin-bottom:6px">End time</label>
+        <input id="modalSchTo" type="time" value="17:00" style="width:100%;box-sizing:border-box">
+      </div>
+    </div>
+
+    <div style="margin-top:14px">
+      <label class="ytf-caption" style="display:block;font-weight:600;margin-bottom:6px">Active days</label>
+      <div class="ytf-pill-group" id="modalSchDayGroup" style="padding:0">
+        <button type="button" class="ytf-pill active" data-modalschday="1">Mon</button>
+        <button type="button" class="ytf-pill active" data-modalschday="2">Tue</button>
+        <button type="button" class="ytf-pill active" data-modalschday="3">Wed</button>
+        <button type="button" class="ytf-pill active" data-modalschday="4">Thu</button>
+        <button type="button" class="ytf-pill active" data-modalschday="5">Fri</button>
+        <button type="button" class="ytf-pill" data-modalschday="6">Sat</button>
+        <button type="button" class="ytf-pill" data-modalschday="0">Sun</button>
+      </div>
+    </div>
+
+    <div class="modal-section-card" style="margin-top:16px">
+      <div class="ytf-row" style="padding:0">
+        <div>
+          <strong>Strict Mode</strong>
+          <div class="ytf-caption">Locks allowlists, schedule status, and times before start through end of schedule.</div>
+        </div>
+        <label class="ytf-switch"><input type="checkbox" id="modalSchStrict"><span class="track"></span><span class="thumb"></span></label>
+      </div>
+      <div id="modalBoxStrictMin" style="display:none;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--ytf-separator)">
+        <div>
+          <strong style="font-size:13px">Lock settings before start (minutes)</strong>
+          <div class="ytf-caption">10 to 360 minutes before start time.</div>
+        </div>
+        <input id="modalSchStrictMin" type="number" min="10" max="360" value="60" style="width:75px">
+      </div>
+      <div id="modalSchStrictErr" class="ytf-caption" style="display:none;color:#d70015;margin-top:6px;font-weight:500" role="alert"></div>
+    </div>
+
+    <div class="modal-section-card" style="margin-top:12px">
+      <div class="ytf-row" style="padding:0">
+        <div>
+          <strong>Pre-schedule notification</strong>
+          <div class="ytf-caption">Shows a 5-second center notification popup on YouTube before the schedule starts.</div>
+        </div>
+        <label class="ytf-switch"><input type="checkbox" id="modalSchNotify"><span class="track"></span><span class="thumb"></span></label>
+      </div>
+      <div id="modalBoxNotifyMin" style="display:none;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--ytf-separator)">
+        <div>
+          <strong style="font-size:13px">Notify time before start (minutes)</strong>
+          <div class="ytf-caption">Must be less than Strict lock minutes if Strict Mode is on.</div>
+        </div>
+        <input id="modalSchNotifyMin" type="number" min="1" max="359" value="15" style="width:75px">
+      </div>
+      <div id="modalSchNotifyErr" class="ytf-caption" style="display:none;color:#d70015;margin-top:6px;font-weight:500" role="alert"></div>
+    </div>
+
+    <div id="modalSchError" class="ytf-caption" style="display:none;color:#d70015;margin-top:14px;font-weight:600;padding:10px 12px;background:rgba(215,0,21,0.08);border-radius:10px" role="alert"></div>
+
+    <div class="dialog-actions" style="margin-top:20px;justify-content:flex-end">
+      <button type="button" class="ytf-btn ytf-btn-secondary" id="btnModalSchCancel">Cancel</button>
+      <button type="button" class="ytf-btn ytf-btn-primary" id="btnModalSchSave">Add schedule</button>
     </div>
   </dialog>
 </main>

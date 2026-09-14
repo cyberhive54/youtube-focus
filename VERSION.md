@@ -21,6 +21,7 @@ Additional rules:
 
 | Version | Date | Changes | Tests |
 |---|---|---|---|
+| 3.1.0 | 2026-09-15 | Redesigned schedule creation and editing into a popup modal dialog (#scheduleModal); fixed crowded/touching buttons on schedule cards with spacious flex-start header, distinct button borders, 10px gap, dedicated schedule time & badges row, and new 'Edit' action. | JS syntax checks; node test_v3_schedules 6/6 passed; policy 136/136 |
 | 3.0.0 | 2026-09-15 | Major release: Dedicated Schedules tab in Settings; per-schedule independent channel and video allowlists (editable instantly with zero midnight delays when idle; locked when blocking); per-schedule active/inactive toggle; configurable Strict Mode (10–360 min pre-lock); configurable pre-schedule notification (< strict lock mins); 5-second dismissible center notification popup on YouTube; inline validation errors and live UI feedback. | JS syntax checks; test_v3_schedules 6/6 passed; policy 136/136; recs 4/4 |
 | 2.9.7 | 2026-09-15 | Fixed pending allowlist changes applying immediately instead of at midnight due to todayKey vs tomorrowKey stamping in stagePending. | JS syntax checks; node VM test passed |
 | 2.9.6 | 2026-09-15 | Study Mode allowlist additions during active blocks now display with inline pending badges and instant setup note; versioning synced across manifest, docs, and update manifests. | JS syntax checks; node VM test passed |
