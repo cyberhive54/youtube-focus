@@ -21,6 +21,7 @@ Additional rules:
 
 | Version | Date | Changes | Tests |
 |---|---|---|---|
+| 2.9.7 | 2026-09-15 | Fixed pending allowlist changes applying immediately instead of at midnight due to todayKey vs tomorrowKey stamping in stagePending. | JS syntax checks; node VM test passed |
 | 2.9.6 | 2026-09-15 | Study Mode allowlist additions during active blocks now display with inline pending badges and instant setup note; versioning synced across manifest, docs, and update manifests. | JS syntax checks; node VM test passed |
 | 2.9.5 | 2026-09-15 | Added instant visual feedback for Study Mode channel/video removals with inline 'Removal pending (at midnight)' status badge and immediate Cancel option. | JS syntax checks; node VM test passed |
 | 2.9.4 | 2026-09-15 | Fixed stagePending scope ReferenceError in options controller preventing allowlist removals from executing. | JS syntax checks; node VM test passed |

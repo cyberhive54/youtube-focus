@@ -943,7 +943,7 @@
       return p.op === op && p.kind === kind && keyOf(p.kind, p.value) === targetKey;
     });
     if (exists) return;
-    settings.study.pendingChanges.push({ op: op, kind: kind, value: value, day: store.todayKey() });
+    settings.study.pendingChanges.push({ op: op, kind: kind, value: value, day: store.tomorrowKey(Date.now()) });
     if (op === 'add') {
       var note = $('studySetupNote');
       if (note) {
