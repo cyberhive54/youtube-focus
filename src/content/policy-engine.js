@@ -134,6 +134,41 @@
     } catch (e) { return false; }
   }
 
+  function calcScheduleDuration(fromStr, toStr) {
+    function t2m(s) {
+      if (!s || typeof s !== 'string') return 0;
+      var p = s.split(':');
+      return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
+    }
+    var f = t2m(fromStr);
+    var t = t2m(toStr);
+    if (f === t) return 0;
+    if (t > f) return t - f;
+    return (1440 - f) + t;
+  }
+
+  function getScheduleBreakCooldownRemaining(schedule, now) {
+    if (!schedule || !schedule.breaksEnabled || !schedule.lastBreakEndedAt) return 0;
+    now = (now !== undefined && now !== null) ? now : Date.now();
+    var duration = calcScheduleDuration(schedule.from, schedule.to);
+    var defPct = (schedule.strict || schedule.strictMode) ? 10 : 5;
+    var pct = schedule.breakBetweenPercent || defPct;
+    var requiredCooldownMs = Math.ceil(duration * (pct / 100)) * 60 * 1000;
+    var cooldownEnd = schedule.lastBreakEndedAt + requiredCooldownMs;
+    if (now < cooldownEnd) {
+      return cooldownEnd - now;
+    }
+    return 0;
+  }
+
+  function getMaxSingleBreakMinutes(schedule) {
+    if (!schedule || !schedule.breaksEnabled) return 0;
+    var totalMin = schedule.breakMinutes || 0;
+    var defPct = (schedule.strict || schedule.strictMode) ? 50 : 75;
+    var pct = schedule.maxPerBreakPercent || defPct;
+    return Math.max(1, Math.floor(totalMin * (pct / 100)));
+  }
+
   function isScheduleBreakActive(settings, now) {
     now = now || Date.now();
     var b = settings && settings.activeBreak;
@@ -579,6 +614,9 @@
     isScheduleStrictLocked: isScheduleStrictLocked,
     scheduleStrictMinutesRemaining: scheduleStrictMinutesRemaining,
     isScheduleDueNotification: isScheduleDueNotification,
-    isScheduleBreakActive: isScheduleBreakActive
+    isScheduleBreakActive: isScheduleBreakActive,
+    getScheduleBreakCooldownRemaining: getScheduleBreakCooldownRemaining,
+    getMaxSingleBreakMinutes: getMaxSingleBreakMinutes,
+    calcScheduleDuration: calcScheduleDuration
   };
 })();

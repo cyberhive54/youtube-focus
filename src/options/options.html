@@ -488,6 +488,7 @@
         <input id="modalSchTo" type="time" value="17:00" style="width:100%;box-sizing:border-box">
       </div>
     </div>
+    <div class="ytf-caption" id="modalSchDurationHint" style="margin-top:4px;color:rgba(120,120,128,0.9)">Minimum schedule duration is 30 minutes.</div>
 
     <div style="margin-top:14px">
       <label class="ytf-caption" style="display:block;font-weight:600;margin-bottom:6px">Active days</label>
@@ -550,7 +551,7 @@
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
           <div>
             <strong style="font-size:13px">Total break time allowance (minutes)</strong>
-            <div class="ytf-caption" id="modalSchBreakMinHint">Up to 20% of schedule time (Strict OFF) or 10% (Strict ON).</div>
+            <div class="ytf-caption" id="modalSchBreakMinHint">5% to 20% of schedule time (Strict OFF) or 2.5% to 10% (Strict ON).</div>
           </div>
           <input id="modalSchBreakMin" type="number" min="1" max="288" value="15" style="width:75px">
         </div>
@@ -561,6 +562,29 @@
           </div>
           <input id="modalSchBreakCount" type="number" min="1" max="20" value="2" style="width:75px">
         </div>
+
+        <!-- Collapsible Advanced Break Rules Section -->
+        <details id="modalBoxBreaksAdvanced" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;margin-top:4px">
+          <summary style="font-size:12.5px;font-weight:600;cursor:pointer;color:var(--ytf-text);user-select:none">⚙ Advanced Break Rules (Cooldown &amp; Single Break Limits)</summary>
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div>
+                <strong style="font-size:12.5px">Time between breaks (% of schedule)</strong>
+                <div class="ytf-caption" id="modalSchBreakBetweenHint">Strict: min 5%, def 10%, max 50% | Non-strict: min 5%, def 5%, max 75%</div>
+              </div>
+              <input id="modalSchBreakBetweenPct" type="number" min="5" max="75" value="10" style="width:75px">
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div>
+                <strong style="font-size:12.5px">Max time per single break (% of break budget)</strong>
+                <div class="ytf-caption" id="modalSchBreakMaxPerBreakHint">Strict: def &amp; max 50% | Non-strict: def &amp; max 75%</div>
+              </div>
+              <input id="modalSchBreakMaxPerBreakPct" type="number" min="10" max="75" value="50" style="width:75px">
+            </div>
+            <div id="modalSchBreakAdvErr" class="ytf-inline-error" style="display:none" role="alert"></div>
+          </div>
+        </details>
+
         <div id="modalSchBreakErr" class="ytf-inline-error" style="display:none" role="alert"></div>
       </div>
     </div>

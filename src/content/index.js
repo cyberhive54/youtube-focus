@@ -431,6 +431,30 @@
       opts.masterOn = !!(window.YTFOCUS.policy && window.YTFOCUS.policy.isBlockingActive(settings, Date.now()));
     } catch (e) {}
     try {
+      var nowB = Date.now();
+      var activeSch = window.YTFOCUS.policy && window.YTFOCUS.policy.activeSchedule(settings, nowB);
+      if (activeSch && activeSch.breaksEnabled) {
+        var remBreakMin = Math.max(0, (activeSch.breakMinutes || 0) - (activeSch.breakMinutesUsed || 0));
+        var remBreakCount = Math.max(0, (activeSch.breakCount || 0) - (activeSch.breaksUsedCount || 0));
+        var cooldownMs = window.YTFOCUS.policy.getScheduleBreakCooldownRemaining(activeSch, nowB);
+        var maxSingle = window.YTFOCUS.policy.getMaxSingleBreakMinutes(activeSch);
+        var maxChoice = Math.min(remBreakMin, maxSingle);
+        var choices = [5, 10, 15, maxChoice].filter(function (v, idx, arr) {
+          return v > 0 && v <= maxChoice && arr.indexOf(v) === idx;
+        }).sort(function (a, b) { return a - b; });
+
+        opts.schBreak = {
+          allowed: true,
+          remCount: remBreakCount,
+          remMin: remBreakMin,
+          onCooldown: cooldownMs > 0,
+          cooldownMins: Math.ceil(cooldownMs / 60000),
+          maxSingleMin: maxSingle,
+          choices: choices
+        };
+      }
+    } catch (eBreak) {}
+    try {
       opts.route = window.YTFOCUS.detector.classifyRoute(location.href);
       opts.mode = window.YTFOCUS.policy.effectiveMode(settings, Date.now());
     } catch (e) {}
@@ -902,6 +926,181 @@
         });
       }
     });
+
+    document.addEventListener('ytf:start-break', function (e) {
+      if (!settings) return;
+      var now = Date.now();
+      var sch = null;
+      try { sch = window.YTFOCUS.policy && window.YTFOCUS.policy.activeSchedule(settings, now); } catch (err) {}
+      if (!sch || !sch.breaksEnabled) return;
+      var dur = (e && e.detail && e.detail.durationMinutes) || 5;
+      var totalBreakMin = sch.breakMinutes || 0;
+      var usedBreakMin = sch.breakMinutesUsed || 0;
+      var remBreakMin = Math.max(0, totalBreakMin - usedBreakMin);
+      var totalBreakCount = sch.breakCount || 0;
+      var usedBreakCount = sch.breaksUsedCount || 0;
+      var remBreakCount = Math.max(0, totalBreakCount - usedBreakCount);
+      if (remBreakCount <= 0 || remBreakMin <= 0) return;
+
+      dur = Math.min(remBreakMin, dur);
+      var maxSingle = (window.YTFOCUS.policy && window.YTFOCUS.policy.getMaxSingleBreakMinutes)
+        ? window.YTFOCUS.policy.getMaxSingleBreakMinutes(sch) : dur;
+      if (maxSingle > 0) dur = Math.min(dur, maxSingle);
+
+      var schList = (settings.schedules) || (settings.study && settings.study.schedule) || [];
+      var updatedSchedules = schList.map(function (s) {
+        if (s.id === sch.id) {
+          return Object.assign({}, s, {
+            breaksUsedCount: (s.breaksUsedCount || 0) + 1,
+            breakMinutesUsed: (s.breakMinutesUsed || 0) + dur
+          });
+        }
+        return s;
+      });
+
+      var activeBreak = {
+        scheduleId: sch.id,
+        startedAt: now,
+        endsAt: now + dur * 60000,
+        durationMinutes: dur
+      };
+
+      var patch = { activeBreak: activeBreak };
+      if (settings.schedules) patch.schedules = updatedSchedules;
+      else if (settings.study && settings.study.schedule) {
+        settings.study.schedule = updatedSchedules;
+        patch.study = settings.study;
+      }
+      chrome.storage.local.set(patch).then(function () {
+        settings.activeBreak = activeBreak;
+        if (settings.schedules) settings.schedules = updatedSchedules;
+        else if (settings.study && settings.study.schedule) settings.study.schedule = updatedSchedules;
+        if (window.YTFOCUS.overlay && window.YTFOCUS.overlay.hideBlockedScreen) {
+          window.YTFOCUS.overlay.hideBlockedScreen();
+        }
+        execute(location.href);
+      }).catch(function () {});
+    });
+
+    document.addEventListener('ytf:end-break', function () {
+      if (!settings || !settings.activeBreak) return;
+      var now = Date.now();
+      var ab = settings.activeBreak;
+      var elapsedMs = Math.max(0, now - (ab.startedAt || now));
+      var elapsedMin = Math.min(ab.durationMinutes || 0, Math.ceil(elapsedMs / 60000));
+      var refundMin = Math.max(0, (ab.durationMinutes || 0) - elapsedMin);
+
+      var schList = (settings.schedules) || (settings.study && settings.study.schedule) || [];
+      var updatedSchedules = schList.map(function (s) {
+        if (s.id === ab.scheduleId) {
+          var newUsed = Math.max(0, (s.breakMinutesUsed || 0) - refundMin);
+          return Object.assign({}, s, { breakMinutesUsed: newUsed, lastBreakEndedAt: now });
+        }
+        return s;
+      });
+
+      var patch = { activeBreak: null };
+      if (settings.schedules) patch.schedules = updatedSchedules;
+      else if (settings.study && settings.study.schedule) {
+        settings.study.schedule = updatedSchedules;
+        patch.study = settings.study;
+      }
+      chrome.storage.local.set(patch).then(function () {
+        settings.activeBreak = null;
+        if (settings.schedules) settings.schedules = updatedSchedules;
+        else if (settings.study && settings.study.schedule) settings.study.schedule = updatedSchedules;
+        execute(location.href);
+      }).catch(function () {});
+    });
+  }
+
+  var BREAK_HOST_ID = 'yt-focus-break-host';
+  var warnedBreakEndsAt = 0;
+
+  function playBreakWarningSound() {
+    try {
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      var ctx = new AudioCtx();
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.45);
+    } catch (e) {}
+  }
+
+  function renderFloatingBreakPill() {
+    var now = Date.now();
+    var isBreak = false;
+    try { isBreak = window.YTFOCUS.policy && window.YTFOCUS.policy.isScheduleBreakActive(settings, now); } catch (e) {}
+    var old = document.getElementById(BREAK_HOST_ID);
+    if (!isBreak) {
+      if (old) old.remove();
+      return;
+    }
+    var ab = settings.activeBreak;
+    var remMs = Math.max(0, (ab.endsAt || 0) - now);
+    if (remMs <= 0) {
+      if (old) old.remove();
+      return;
+    }
+
+    if (remMs <= 60000 && warnedBreakEndsAt !== ab.endsAt) {
+      warnedBreakEndsAt = ab.endsAt;
+      playBreakWarningSound();
+      if (window.YTFOCUS.overlay && window.YTFOCUS.overlay.showReminderToast) {
+        window.YTFOCUS.overlay.showReminderToast('☕ 1 minute left in your scheduled break. Prepare to resume focus.');
+      }
+    }
+
+    var host = old;
+    if (!host) {
+      host = document.createElement('div');
+      host.id = BREAK_HOST_ID;
+      host.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:2147483645;pointer-events:auto;';
+      document.documentElement.appendChild(host);
+      var root = host.attachShadow({ mode: 'open' });
+      var style = document.createElement('style');
+      style.textContent =
+        '.ytf-break-pill-wrap{display:inline-flex;align-items:center;gap:10px;padding:8px 14px;' +
+        'background:rgba(28,28,30,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);' +
+        'border:1px solid rgba(255,149,0,0.4);border-radius:980px;box-shadow:0 8px 24px rgba(0,0,0,0.35);' +
+        'color:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:13px;font-weight:600;}' +
+        '.ytf-break-timer{color:#ff9500;font-family:monospace;font-size:14px;}' +
+        '.ytf-break-end-btn{border:0;background:rgba(255,255,255,0.15);color:#fff;border-radius:980px;' +
+        'padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.15s;}' +
+        '.ytf-break-end-btn:hover{background:rgba(255,255,255,0.25);}';
+      root.appendChild(style);
+      var wrap = document.createElement('div');
+      wrap.className = 'ytf-break-pill-wrap';
+      wrap.innerHTML =
+        '<span>☕ Break active:</span>' +
+        '<span class="ytf-break-timer" id="timer"></span>' +
+        '<button type="button" class="ytf-break-end-btn" id="endBtn">End early</button>';
+      root.appendChild(wrap);
+      var endBtn = wrap.querySelector('#endBtn');
+      if (endBtn) {
+        endBtn.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          document.dispatchEvent(new CustomEvent('ytf:end-break'));
+        });
+      }
+    }
+
+    var timerEl = host.shadowRoot && host.shadowRoot.getElementById('timer');
+    if (timerEl) {
+      var secTotal = Math.ceil(remMs / 1000);
+      var m = Math.floor(secTotal / 60);
+      var s = secTotal % 60;
+      timerEl.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+    }
   }
 
   function init() {
@@ -949,6 +1148,21 @@
         if (!settings) return;
         try { execute(location.href); } catch (e) {}
       }, 60000);
+
+      // Schedule break live floating pill & 1m warning ticker
+      setInterval(function () {
+        if (!settings) return;
+        try { renderFloatingBreakPill(); } catch (eB) {}
+      }, 1000);
+
+      chrome.runtime.onMessage.addListener(function (msg) {
+        if (msg && msg.type === 'ytf:break-warn-1m') {
+          playBreakWarningSound();
+          if (window.YTFOCUS.overlay && window.YTFOCUS.overlay.showReminderToast) {
+            window.YTFOCUS.overlay.showReminderToast('☕ 1 minute left in your scheduled break. Prepare to resume focus.');
+          }
+        }
+      });
     }).catch(function () {});
 
     chrome.storage.onChanged.addListener(function (changes) {

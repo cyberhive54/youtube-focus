@@ -285,10 +285,19 @@
           var totalBreakCount = sch.breakCount || 0;
           var usedBreakCount = sch.breaksUsedCount || 0;
           var remBreakCount = Math.max(0, totalBreakCount - usedBreakCount);
+          var cooldownMs = (window.YTFOCUS.policy && window.YTFOCUS.policy.getScheduleBreakCooldownRemaining)
+            ? window.YTFOCUS.policy.getScheduleBreakCooldownRemaining(sch, now) : 0;
+          var maxSingleMin = (window.YTFOCUS.policy && window.YTFOCUS.policy.getMaxSingleBreakMinutes)
+            ? window.YTFOCUS.policy.getMaxSingleBreakMinutes(sch) : remBreakMin;
+          var maxChoice = Math.min(remBreakMin, maxSingleMin);
 
           var bSummary = $('schBreakSummary');
           if (bSummary) {
-            bSummary.textContent = remBreakCount + ' break' + (remBreakCount === 1 ? '' : 's') + ' left · ' + remBreakMin + 'm remaining allowance';
+            var sumText = remBreakCount + ' break' + (remBreakCount === 1 ? '' : 's') + ' left · ' + remBreakMin + 'm remaining allowance';
+            if (cooldownMs > 0) {
+              sumText += ' · Cooldown active (' + Math.ceil(cooldownMs / 60000) + 'm)';
+            }
+            bSummary.textContent = sumText;
           }
 
           var bChoices = $('schBreakChoices');
@@ -296,26 +305,33 @@
           if (bChoices) {
             bChoices.innerHTML = '';
             if (remBreakCount > 0 && remBreakMin > 0) {
-              var opts = [5, 10, 15, remBreakMin].filter(function (v, i, arr) {
-                return v > 0 && v <= remBreakMin && arr.indexOf(v) === i;
+              var opts = [5, 10, 15, maxChoice].filter(function (v, i, arr) {
+                return v > 0 && v <= maxChoice && arr.indexOf(v) === i;
               }).sort(function (a, b) { return a - b; });
+              if (!opts.length && maxChoice > 0) opts = [maxChoice];
 
               opts.forEach(function (optVal) {
                 var btn = document.createElement('button');
                 btn.className = 'ytf-pill' + (selectedBreakDuration === optVal ? ' active' : '');
-                btn.textContent = (optVal === remBreakMin && opts.length > 1 ? 'All (' + optVal + 'm)' : optVal + 'm');
+                btn.textContent = (optVal === maxChoice && opts.length > 1 ? 'Max (' + optVal + 'm)' : optVal + 'm');
+                btn.disabled = cooldownMs > 0;
                 btn.addEventListener('click', function () {
                   selectedBreakDuration = optVal;
                   render();
                 });
                 bChoices.appendChild(btn);
               });
-              if (!selectedBreakDuration || selectedBreakDuration > remBreakMin) {
+              if (!selectedBreakDuration || selectedBreakDuration > maxChoice) {
                 selectedBreakDuration = opts[0];
               }
               if (startBtn) {
-                startBtn.disabled = false;
-                startBtn.textContent = '☕ Start ' + selectedBreakDuration + ' min break';
+                if (cooldownMs > 0) {
+                  startBtn.disabled = true;
+                  startBtn.textContent = '☕ Cooldown active (' + Math.ceil(cooldownMs / 60000) + 'm left)';
+                } else {
+                  startBtn.disabled = false;
+                  startBtn.textContent = '☕ Start ' + selectedBreakDuration + ' min break';
+                }
               }
             } else {
               bChoices.innerHTML = '<span class="ytf-caption">No breaks remaining for today.</span>';
@@ -530,7 +546,15 @@
         var remBreakCount = Math.max(0, totalBreakCount - usedBreakCount);
         if (remBreakCount <= 0 || remBreakMin <= 0) return;
 
+        var cooldownMs = (window.YTFOCUS.policy && window.YTFOCUS.policy.getScheduleBreakCooldownRemaining)
+          ? window.YTFOCUS.policy.getScheduleBreakCooldownRemaining(sch, now) : 0;
+        if (cooldownMs > 0) return;
+
+        var maxSingleMin = (window.YTFOCUS.policy && window.YTFOCUS.policy.getMaxSingleBreakMinutes)
+          ? window.YTFOCUS.policy.getMaxSingleBreakMinutes(sch) : remBreakMin;
         var dur = Math.min(remBreakMin, selectedBreakDuration || 5);
+        if (maxSingleMin > 0) dur = Math.min(dur, maxSingleMin);
+
         var startedAt = now;
         var endsAt = now + dur * 60 * 1000;
 
@@ -574,7 +598,7 @@
         var updatedSchedules = (settings.schedules || []).map(function (s) {
           if (s.id === ab.scheduleId) {
             var newUsed = Math.max(0, (s.breakMinutesUsed || 0) - refundMin);
-            return Object.assign({}, s, { breakMinutesUsed: newUsed });
+            return Object.assign({}, s, { breakMinutesUsed: newUsed, lastBreakEndedAt: now });
           }
           return s;
         });

@@ -318,7 +318,8 @@
       masterOn: opts.masterOn !== false,
       allowedChannels: (opts.allowedChannels || []).slice(0, 6),
       allowedVideos: (opts.allowedVideos || []).slice(0, 3),
-      whyLines: (opts.whyLines || []).slice()
+      whyLines: (opts.whyLines || []).slice(),
+      schBreak: opts.schBreak || null
     };
   }
 
@@ -414,11 +415,35 @@
       studyActionHtml = '<div class="ytf-study-action"><button class="ytf-btn ytf-btn-primary" data-action="switch-study" type="button">📚 Switch to Study Mode</button></div>';
     }
 
+    var schBreakHtml = '';
+    if (prep.schBreak && prep.schBreak.allowed) {
+      var sb = prep.schBreak;
+      if (sb.onCooldown) {
+        schBreakHtml = '<div class="ytf-break-sheet" style="margin-top:10px;text-align:center">' +
+          '<span class="ytf-pill" style="opacity:0.8;cursor:default;font-size:12px;padding:6px 12px">☕ Break on cooldown (' + sb.cooldownMins + ' min remaining)</span>' +
+        '</div>';
+      } else if (sb.remCount > 0 && sb.remMin > 0) {
+        schBreakHtml = '<div class="ytf-break-sheet" style="margin-top:12px;width:100%">' +
+          '<div style="font-size:12px;color:rgba(120,120,128,0.95);margin-bottom:6px;text-align:center;font-weight:600">☕ ' + sb.remCount + ' break' + (sb.remCount === 1 ? '' : 's') + ' left (' + sb.remMin + 'm allowance)</div>' +
+          '<div class="ytf-pills" style="justify-content:center;gap:6px">' +
+            sb.choices.map(function (c) {
+              return '<button type="button" class="ytf-pill ytf-choice" data-action="start-break" data-break-min="' + c + '"><span>Take ' + c + 'm break</span></button>';
+            }).join('') +
+          '</div>' +
+        '</div>';
+      } else {
+        schBreakHtml = '<div class="ytf-break-sheet" style="margin-top:10px;text-align:center">' +
+          '<span class="ytf-caption" style="font-size:12px">☕ Daily schedule break limit reached</span>' +
+        '</div>';
+      }
+    }
+
     return '<section class="ytf-card" aria-labelledby="ytf-card-title">' +
         '<div class="ytf-icon">' + iconSvg(copy.icon) + '</div>' +
         '<h1 class="ytf-title" id="ytf-card-title">' + esc(copy.title) + '</h1>' +
         '<p class="ytf-sub">' + esc(copy.sub) + '</p>' +
         studyActionHtml +
+        schBreakHtml +
         pauseSheet +
         allowHtml +
         whyHtml +
@@ -445,6 +470,13 @@
     wrap.querySelectorAll('[data-action="switch-study"]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         emit('ytf:switch-study');
+      });
+    });
+
+    wrap.querySelectorAll('[data-action="start-break"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var min = parseInt(btn.getAttribute('data-break-min'), 10) || 5;
+        emit('ytf:start-break', { durationMinutes: min });
       });
     });
 

@@ -283,10 +283,34 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
     chrome.storage.local.set({ snoozeUntil: 0 }).catch(function () {});
     refreshBadge().catch(function () {});
   }
+  if (alarm.name === 'ytf-break-warn') {
+    chrome.tabs.query({ url: ['*://*.youtube.com/*'] }, function (tabs) {
+      (tabs || []).forEach(function (tab) {
+        if (tab.id) {
+          chrome.tabs.sendMessage(tab.id, { type: 'ytf:break-warn-1m' }).catch(function () {});
+        }
+      });
+    });
+  }
   if (alarm.name === 'ytf-break-end') {
     getSettings().then(function (s) {
-      if (s.activeBreak && Date.now() >= s.activeBreak.endsAt) {
-        return chrome.storage.local.set({ activeBreak: null });
+      if (s.activeBreak) {
+        var ab = s.activeBreak;
+        var now = Date.now();
+        var schList = (s.schedules) || (s.study && s.study.schedule) || [];
+        var updatedSchedules = schList.map(function (sch) {
+          if (sch.id === ab.scheduleId) {
+            return Object.assign({}, sch, { lastBreakEndedAt: now });
+          }
+          return sch;
+        });
+        var p = { activeBreak: null };
+        if (s.schedules) p.schedules = updatedSchedules;
+        else if (s.study && s.study.schedule) {
+          s.study.schedule = updatedSchedules;
+          p.study = s.study;
+        }
+        return chrome.storage.local.set(p);
       }
     }).then(refreshBadge).catch(function () {});
   }
@@ -309,7 +333,20 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
       var now = Date.now();
       var patch = {};
       if (s.activeBreak && now >= s.activeBreak.endsAt) {
+        var ab = s.activeBreak;
+        var schList = (s.schedules) || (s.study && s.study.schedule) || [];
+        var updatedSchedules = schList.map(function (sch) {
+          if (sch.id === ab.scheduleId) {
+            return Object.assign({}, sch, { lastBreakEndedAt: now });
+          }
+          return sch;
+        });
         patch.activeBreak = null;
+        if (s.schedules) patch.schedules = updatedSchedules;
+        else if (s.study && s.study.schedule) {
+          s.study.schedule = updatedSchedules;
+          patch.study = s.study;
+        }
       }
       if (s.snoozeUntil && now >= s.snoozeUntil) {
         patch.snoozeUntil = 0;
@@ -374,9 +411,17 @@ chrome.storage.onChanged.addListener(function (changes) {
     refreshBadge().catch(function () {});
     if (changes.activeBreak) {
       if (changes.activeBreak.newValue && changes.activeBreak.newValue.endsAt) {
-        chrome.alarms.create('ytf-break-end', { when: changes.activeBreak.newValue.endsAt });
+        var bEndsAt = changes.activeBreak.newValue.endsAt;
+        chrome.alarms.create('ytf-break-end', { when: bEndsAt });
+        var warnAt = bEndsAt - 60000;
+        if (warnAt > Date.now()) {
+          chrome.alarms.create('ytf-break-warn', { when: warnAt });
+        } else {
+          chrome.alarms.clear('ytf-break-warn').catch(function () {});
+        }
       } else {
         chrome.alarms.clear('ytf-break-end').catch(function () {});
+        chrome.alarms.clear('ytf-break-warn').catch(function () {});
       }
     }
     if (changes.snoozeUntil && changes.snoozeUntil.newValue) {
