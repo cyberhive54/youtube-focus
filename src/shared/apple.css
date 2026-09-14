@@ -20,7 +20,9 @@
   --ytf-text-2: #6e6e73;
   --ytf-separator: rgba(0, 0, 0, 0.08);
   --ytf-fill-2: rgba(0, 0, 0, 0.05);
-  --ytf-danger: #d70015;
+  --ytf-danger: #c40012;
+  --ytf-danger-bg: rgba(196, 0, 18, 0.08);
+  --ytf-danger-border: rgba(196, 0, 18, 0.22);
   --ytf-success: #1d8127;
   --ytf-radius-card: 18px;
   --ytf-radius-pill: 980px;
@@ -38,6 +40,9 @@
     --ytf-separator: rgba(255, 255, 255, 0.12);
     --ytf-fill-2: rgba(255, 255, 255, 0.08);
     --ytf-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    --ytf-danger: #ff6961;
+    --ytf-danger-bg: rgba(255, 105, 97, 0.15);
+    --ytf-danger-border: rgba(255, 105, 97, 0.35);
   }
 }
 

@@ -52,7 +52,7 @@
       <div>
         <strong>Daily YouTube limit (minutes)</strong>
         <div class="ytf-caption">How much active YouTube time per day. Watching, searching and browsing all count; background tabs and idle time don't.</div>
-        <div id="quotaError" class="ytf-caption" style="display:none;color:#d70015;margin-top:4px;font-weight:500" role="alert">Must be a number between 1 and 1440 minutes.</div>
+        <div id="quotaError" class="ytf-inline-error" style="display:none" role="alert">Must be a number between 1 and 1440 minutes.</div>
       </div>
       <input id="lQuotaMin" type="number" min="1" max="1440" style="width:90px">
     </div>
@@ -206,7 +206,7 @@
       <div>
         <strong>Videos per day</strong>
         <div class="ytf-caption">Limit how many videos can be played per day. Study-allowlisted channels and videos bypass this limit.</div>
-        <div id="warnBlockAllVideos" class="ytf-caption" style="display:none;color:#d70015;margin-top:4px;font-weight:500">Blocking all videos stops regular video playback completely. Only allowlisted Study channels/videos can play.</div>
+        <div id="warnBlockAllVideos" class="ytf-inline-error" style="display:none">Blocking all videos stops regular video playback completely. Only allowlisted Study channels/videos can play.</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
         <select id="selVideosLimit">
@@ -389,7 +389,7 @@
       <p class="ytf-body">Type <strong style="letter-spacing:1px">RESET</strong> below to confirm permanent deletion.</p>
       <input id="resetConfirmInput" type="text" placeholder="Type RESET" autocomplete="off" style="text-transform:uppercase;margin:12px 0">
       <div class="dialog-actions">
-        <button class="ytf-btn ytf-btn-danger" id="resetBtnFinal" type="button" disabled style="background:#d70015;color:#fff">Permanently erase all data</button>
+        <button class="ytf-btn ytf-btn-danger" id="resetBtnFinal" type="button" disabled style="background:var(--ytf-danger);color:#fff">Permanently erase all data</button>
         <button class="ytf-btn ytf-btn-secondary" id="resetBtnCancel2" type="button">Cancel</button>
       </div>
     </div>
@@ -477,7 +477,7 @@
         </div>
         <input id="modalSchStrictMin" type="number" min="10" max="360" value="60" style="width:75px">
       </div>
-      <div id="modalSchStrictErr" class="ytf-caption" style="display:none;color:#d70015;margin-top:6px;font-weight:500" role="alert"></div>
+      <div id="modalSchStrictErr" class="ytf-inline-error" style="display:none" role="alert"></div>
     </div>
 
     <div class="modal-section-card" style="margin-top:12px">
@@ -495,10 +495,10 @@
         </div>
         <input id="modalSchNotifyMin" type="number" min="1" max="359" value="15" style="width:75px">
       </div>
-      <div id="modalSchNotifyErr" class="ytf-caption" style="display:none;color:#d70015;margin-top:6px;font-weight:500" role="alert"></div>
+      <div id="modalSchNotifyErr" class="ytf-inline-error" style="display:none" role="alert"></div>
     </div>
 
-    <div id="modalSchError" class="ytf-caption" style="display:none;color:#d70015;margin-top:14px;font-weight:600;padding:10px 12px;background:rgba(215,0,21,0.08);border-radius:10px" role="alert"></div>
+    <div id="modalSchError" class="ytf-error-banner" style="display:none" role="alert"></div>
 
     <div class="dialog-actions" style="margin-top:20px;justify-content:flex-end">
       <button type="button" class="ytf-btn ytf-btn-secondary" id="btnModalSchCancel">Cancel</button>
