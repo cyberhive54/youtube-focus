@@ -282,6 +282,7 @@
   function validateModalBreaks() {
     var errEl = $('modalSchBreakErr');
     var advErrEl = $('modalSchBreakAdvErr');
+    var advBox = $('modalBoxBreaksAdvanced');
     var isBreaks = $('modalSchBreaks') ? $('modalSchBreaks').checked : false;
     if (!isBreaks) {
       if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
@@ -332,7 +333,9 @@
     if (isNaN(rawBetween)) rawBetween = defBetween;
     if (rawBetween < 5 || rawBetween > maxBetween) {
       var msg = 'Time between breaks must be between 5% and ' + maxBetween + '% of schedule duration (' + (isStrict ? 'Strict Mode ON' : 'Strict Mode OFF') + ').';
+      if (advBox) advBox.open = true;
       if (advErrEl) { advErrEl.textContent = msg; advErrEl.style.display = 'block'; }
+      if (errEl) { errEl.textContent = 'Advanced break rule: ' + msg; errEl.style.display = 'block'; }
       return { valid: false, error: msg };
     }
 
@@ -344,7 +347,9 @@
     if (isNaN(rawMaxPerBreak)) rawMaxPerBreak = defMaxPerBreak;
     if (rawMaxPerBreak < 10 || rawMaxPerBreak > capMaxPerBreak) {
       var msg = 'Max time per single break must be between 10% and ' + capMaxPerBreak + '% of total break budget (' + (isStrict ? 'Strict Mode ON' : 'Strict Mode OFF') + ').';
+      if (advBox) advBox.open = true;
       if (advErrEl) { advErrEl.textContent = msg; advErrEl.style.display = 'block'; }
+      if (errEl) { errEl.textContent = 'Advanced break rule: ' + msg; errEl.style.display = 'block'; }
       return { valid: false, error: msg };
     }
 
@@ -360,7 +365,7 @@
     };
   }
 
-  function updateModalBreakHints() {
+  function updateModalBreakHints(forceResetDefaults) {
     var fromVal = ($('modalSchFrom') && $('modalSchFrom').value) || '09:00';
     var toVal = ($('modalSchTo') && $('modalSchTo').value) || '17:00';
     var duration = calcScheduleDuration(fromVal, toVal);
@@ -383,6 +388,29 @@
     var maxBreakMin = Math.max(minBreakMin, Math.floor(duration * (maxPct / 100)));
     var maxBreakCount = isStrict ? 10 : 20;
 
+    // Recommended break allowance (10% non-strict, 5% strict)
+    var recPct = isStrict ? 5 : 10;
+    var recBreakMin = Math.max(minBreakMin, Math.min(maxBreakMin, Math.round(duration * (recPct / 100))));
+
+    var minInput = $('modalSchBreakMin');
+    if (minInput) {
+      minInput.min = minBreakMin;
+      minInput.max = maxBreakMin;
+      var curVal = parseInt(minInput.value, 10);
+      if (forceResetDefaults || isNaN(curVal) || curVal < minBreakMin || curVal > maxBreakMin) {
+        minInput.value = recBreakMin;
+      }
+    }
+
+    var countInput = $('modalSchBreakCount');
+    if (countInput) {
+      countInput.max = maxBreakCount;
+      var curCount = parseInt(countInput.value, 10);
+      if (forceResetDefaults || isNaN(curCount) || curCount < 1 || curCount > maxBreakCount) {
+        countInput.value = Math.min(2, maxBreakCount);
+      }
+    }
+
     var minHint = $('modalSchBreakMinHint');
     if (minHint) {
       minHint.textContent = minPct + '% to ' + maxPct + '% of schedule duration (' + minBreakMin + ' to ' + maxBreakMin + ' min for this ' + duration + 'm schedule under ' + (isStrict ? 'Strict Mode ON' : 'Strict Mode OFF') + ').';
@@ -391,32 +419,41 @@
     if (countHint) {
       countHint.textContent = '1 to ' + maxBreakCount + ' breaks allowed with ' + (isStrict ? 'Strict Mode ON' : 'Strict Mode OFF') + '.';
     }
-    if ($('modalSchBreakMin')) {
-      $('modalSchBreakMin').min = minBreakMin;
-      $('modalSchBreakMin').max = maxBreakMin;
-    }
-    if ($('modalSchBreakCount')) $('modalSchBreakCount').max = maxBreakCount;
 
     // Advanced hints
     var defBetween = isStrict ? 10 : 5;
     var maxBetween = isStrict ? 50 : 75;
     var bInput = $('modalSchBreakBetweenPct');
+    if (bInput) {
+      bInput.max = maxBetween;
+      var curBetween = parseInt(bInput.value, 10);
+      if (forceResetDefaults || isNaN(curBetween) || curBetween < 5 || curBetween > maxBetween) {
+        bInput.value = defBetween;
+      }
+    }
     var betweenVal = bInput ? (parseInt(bInput.value, 10) || defBetween) : defBetween;
     var betweenMins = Math.max(1, Math.ceil(duration * (betweenVal / 100)));
     var bHint = $('modalSchBreakBetweenHint');
     if (bHint) {
-      bHint.textContent = betweenVal + '% = ' + betweenMins + ' min cooldown between breaks (min 5%, max ' + maxBetween + '% under ' + (isStrict ? 'Strict Mode ON' : 'Strict Mode OFF') + ').';
+      bHint.textContent = betweenVal + '% = ' + betweenMins + ' min cooldown between breaks (min 5%, def ' + defBetween + '%, max ' + maxBetween + '% under ' + (isStrict ? 'Strict Mode ON' : 'Strict Mode OFF') + ').';
     }
 
     var defMaxPerBreak = isStrict ? 50 : 75;
     var capMaxPerBreak = isStrict ? 50 : 75;
     var mpbInput = $('modalSchBreakMaxPerBreakPct');
+    if (mpbInput) {
+      mpbInput.max = capMaxPerBreak;
+      var curMaxPerBreak = parseInt(mpbInput.value, 10);
+      if (forceResetDefaults || isNaN(curMaxPerBreak) || curMaxPerBreak < 10 || curMaxPerBreak > capMaxPerBreak) {
+        mpbInput.value = defMaxPerBreak;
+      }
+    }
     var mpbVal = mpbInput ? (parseInt(mpbInput.value, 10) || defMaxPerBreak) : defMaxPerBreak;
-    var currentBreakBudget = parseInt($('modalSchBreakMin') ? $('modalSchBreakMin').value : 15, 10) || 15;
+    var currentBreakBudget = parseInt($('modalSchBreakMin') ? $('modalSchBreakMin').value : recBreakMin, 10) || recBreakMin;
     var maxSingleMin = Math.max(1, Math.floor(currentBreakBudget * (mpbVal / 100)));
     var mpbHint = $('modalSchBreakMaxPerBreakHint');
     if (mpbHint) {
-      mpbHint.textContent = mpbVal + '% = max ' + maxSingleMin + ' min for a single break (max cap ' + capMaxPerBreak + '% under ' + (isStrict ? 'Strict Mode ON' : 'Strict Mode OFF') + ').';
+      mpbHint.textContent = mpbVal + '% = max ' + maxSingleMin + ' min for a single break (def & max ' + capMaxPerBreak + '% under ' + (isStrict ? 'Strict Mode ON' : 'Strict Mode OFF') + ').';
     }
 
     if ($('modalSchBreaks') && $('modalSchBreaks').checked) {
@@ -535,7 +572,7 @@
     }
 
     renderModalStudyAllowlist();
-    updateModalBreakHints();
+    updateModalBreakHints(!itemToEdit || !itemToEdit.breaksEnabled);
 
     var customSelect = $('customSchModeSelect');
     if (customSelect) {
@@ -2079,7 +2116,7 @@
         clearModalSchErrors();
         var box = $('modalBoxBreaks');
         if (box) box.style.display = e.target.checked ? 'flex' : 'none';
-        updateModalBreakHints();
+        updateModalBreakHints(e.target.checked);
       });
     }
 
@@ -2249,7 +2286,17 @@
         var breakRes = { valid: true, breakMinutes: 0, breakCount: 0, breakBetweenPercent: 5, maxPerBreakPercent: 75 };
         if (isBreaks) {
           breakRes = validateModalBreaks();
-          if (!breakRes.valid) return;
+          if (!breakRes.valid) {
+            var errEl = $('modalSchError');
+            if (errEl) {
+              errEl.textContent = 'Cannot save schedule: ' + (breakRes.error || 'please fix break settings.');
+              errEl.style.display = 'block';
+              if (typeof errEl.scrollIntoView === 'function') {
+                errEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              }
+            }
+            return;
+          }
         }
 
         var nameVal = ($('modalSchName') && $('modalSchName').value ? $('modalSchName').value.trim() : '');
