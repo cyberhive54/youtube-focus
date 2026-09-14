@@ -419,6 +419,38 @@
       }
     }
 
+    // Helper to check if an item is pending removal
+    function channelPendingIdx(a) {
+      var pend = (settings.study && settings.study.pendingChanges) || [];
+      for (var pI = 0; pI < pend.length; pI++) {
+        var p = pend[pI];
+        if (p.op === 'remove' && p.kind === 'channel') {
+          var pv = p.value || {};
+          if ((pv.id && a.id && pv.id === a.id) ||
+              (pv.handle && a.handle && pv.handle.toLowerCase() === a.handle.toLowerCase()) ||
+              (pv.url && a.url && pv.url.toLowerCase() === a.url.toLowerCase())) {
+            return pI;
+          }
+        }
+      }
+      return -1;
+    }
+
+    function videoPendingIdx(v) {
+      var pend = (settings.study && settings.study.pendingChanges) || [];
+      for (var pI = 0; pI < pend.length; pI++) {
+        var p = pend[pI];
+        if (p.op === 'remove' && p.kind === 'video') {
+          var pv = p.value || {};
+          if ((pv.id && v.id && pv.id === v.id) ||
+              (pv.url && v.url && pv.url === v.url)) {
+            return pI;
+          }
+        }
+      }
+      return -1;
+    }
+
     // Channels (edits stage as midnight-pending, never same-day).
     var ch = $('chList'); ch.innerHTML = '';
     if (!(settings.study.allowedChannels || []).length) {
@@ -429,28 +461,76 @@
       var label = a.handle || a.url || a.id;
       li.innerHTML = '<code></code>';
       li.querySelector('code').textContent = label + (a.id && a.id !== label ? ' (' + a.id + ')' : '');
-      var del = document.createElement('button'); del.textContent = 'Remove';
-      del.addEventListener('click', function () {
-        stagePending('remove', 'channel', a);
-      });
-      li.appendChild(del); ch.appendChild(li);
+      var pIdx = channelPendingIdx(a);
+      if (pIdx !== -1) {
+        var pendBadge = document.createElement('span');
+        pendBadge.className = 'sch-badge-pending';
+        pendBadge.textContent = 'Removal pending (at midnight)';
+        li.appendChild(pendBadge);
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.style.color = 'var(--ytf-blue)';
+        cancelBtn.addEventListener('click', function () {
+          settings.study.pendingChanges.splice(pIdx, 1);
+          save({ study: settings.study });
+        });
+        li.appendChild(cancelBtn);
+      } else {
+        var del = document.createElement('button'); del.textContent = 'Remove';
+        del.addEventListener('click', function () {
+          stagePending('remove', 'channel', a);
+        });
+        li.appendChild(del);
+      }
+      ch.appendChild(li);
     });
+
     var vl = $('vidList'); vl.innerHTML = '';
     if (!(settings.study.allowedVideos || []).length) {
       vl.innerHTML = '<li class="empty">No allowed videos yet — save specific videos you need.</li>';
     }
+    (settings.study.allowedVideos || []).forEach(function (v, i) {
+      var li = document.createElement('li');
+      li.innerHTML = '<code></code>';
+      li.querySelector('code').textContent = v.url || v.id;
+      var pIdx = videoPendingIdx(v);
+      if (pIdx !== -1) {
+        var pendBadge = document.createElement('span');
+        pendBadge.className = 'sch-badge-pending';
+        pendBadge.textContent = 'Removal pending (at midnight)';
+        li.appendChild(pendBadge);
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.style.color = 'var(--ytf-blue)';
+        cancelBtn.addEventListener('click', function () {
+          settings.study.pendingChanges.splice(pIdx, 1);
+          save({ study: settings.study });
+        });
+        li.appendChild(cancelBtn);
+      } else {
+        var del = document.createElement('button'); del.textContent = 'Remove';
+        del.addEventListener('click', function () {
+          stagePending('remove', 'video', v);
+        });
+        li.appendChild(del);
+      }
+      vl.appendChild(li);
+    });
+
     // Pending allowlist changes (activate at local midnight).
     var pl = $('pendList'); pl.innerHTML = '';
     var pend = (settings.study && settings.study.pendingChanges) || [];
     if (pend.length) {
-      pend.forEach(function (ch, i) {
+      pend.forEach(function (chItem, i) {
         var li = document.createElement('li');
         li.innerHTML = '<code></code>';
-        var what = ch.kind === 'channel'
-          ? (ch.value.handle || ch.value.url || ch.value.id || '')
-          : (ch.value.url || ch.value.id || '');
+        var what = chItem.kind === 'channel'
+          ? (chItem.value.handle || chItem.value.url || chItem.value.id || '')
+          : (chItem.value.url || chItem.value.id || '');
         li.querySelector('code').textContent =
-          (ch.op === 'add' ? '＋ ' : '－ ') + (ch.kind === 'channel' ? 'channel ' : 'video ') + what;
+          (chItem.op === 'add' ? '＋ ' : '－ ') + (chItem.kind === 'channel' ? 'channel ' : 'video ') + what;
         var cancel = document.createElement('button'); cancel.textContent = 'Cancel';
         cancel.addEventListener('click', function () {
           settings.study.pendingChanges.splice(i, 1);
@@ -459,16 +539,6 @@
         li.appendChild(cancel); pl.appendChild(li);
       });
     }
-    (settings.study.allowedVideos || []).forEach(function (v, i) {
-      var li = document.createElement('li');
-      li.innerHTML = '<code></code>';
-      li.querySelector('code').textContent = v.url || v.id;
-      var del = document.createElement('button'); del.textContent = 'Remove';
-      del.addEventListener('click', function () {
-        stagePending('remove', 'video', v);
-      });
-      li.appendChild(del); vl.appendChild(li);
-    });
 
     // Schedules
     var sl = $('schList');
@@ -790,6 +860,36 @@
     settings.study[key] = settings.study[key] || [];
     settings.study[key].push(value);
     return save({ study: settings.study });
+  }
+
+  // Allowlist edits stage for midnight, except the first safe starter item;
+  // terminal blocking never permits a same-day allowlist change.
+  function stagePending(op, kind, value) {
+    // A brand-new Study list is safe to seed immediately when terminal block
+    // is inactive: there is no existing rule to weaken, and it lets a new
+    // user begin Study Mode without an arbitrary overnight delay.
+    if (op === 'add' && !hasStudyAllowlist() && !terminalActive()) {
+      addInitialStudyEntry(kind, value);
+      var note = $('studySetupNote');
+      if (note) {
+        note.textContent = 'Your first allowed item is ready now. You can turn on Study Mode.';
+        note.hidden = false;
+      }
+      return;
+    }
+    settings.study = settings.study || {};
+    settings.study.pendingChanges = settings.study.pendingChanges || [];
+    var keyOf = function (k, v) {
+      v = v || {};
+      return k === 'channel' ? 'c:' + (v.id || v.handle || v.url || '') : 'v:' + (v.id || v.url || '');
+    };
+    var targetKey = keyOf(kind, value);
+    var exists = settings.study.pendingChanges.some(function (p) {
+      return p.op === op && p.kind === kind && keyOf(p.kind, p.value) === targetKey;
+    });
+    if (exists) return;
+    settings.study.pendingChanges.push({ op: op, kind: kind, value: value, day: store.todayKey() });
+    save({ study: settings.study });
   }
 
   function finishWelcome(plan) {
@@ -1126,26 +1226,6 @@
         save({ sessionLimits: settings.sessionLimits });
       });
     }
-
-    // Allowlist edits stage for midnight, except the first safe starter item;
-    // terminal blocking never permits a same-day allowlist change.
-    function stagePending(op, kind, value) {
-      // A brand-new Study list is safe to seed immediately when terminal block
-      // is inactive: there is no existing rule to weaken, and it lets a new
-      // user begin Study Mode without an arbitrary overnight delay.
-      if (op === 'add' && !hasStudyAllowlist() && !terminalActive()) {
-        addInitialStudyEntry(kind, value);
-        var note = $('studySetupNote');
-        if (note) {
-          note.textContent = 'Your first allowed item is ready now. You can turn on Study Mode.';
-          note.hidden = false;
-        }
-        return;
-      }
-      settings.study.pendingChanges = settings.study.pendingChanges || [];
-      settings.study.pendingChanges.push({ op: op, kind: kind, value: value, day: store.todayKey() });
-      save({ study: settings.study });
-    }
     $('chAdd').addEventListener('click', function () {
       var p = parseChannel($('chInput').value);
       if (!p) { $('chInput').focus(); return; }
@@ -1161,10 +1241,6 @@
       $('vidInput').value = '';
       stagePending('add', 'video', { id: id, url: v });
     });
-    function timeToMin(t) {
-      var p = String(t || '00:00').split(':');
-      return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
-    }
     function timeMatches(fromMin, toMin, m) {
       if (fromMin === toMin) return false;
       if (fromMin < toMin) return m >= fromMin && m < toMin;
